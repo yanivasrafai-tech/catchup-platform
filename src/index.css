@@ -1,0 +1,10 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Heebo', sans-serif;
+  direction: rtl;
+  background-color: #F8FAFC;
+  color: #0F172A;
+}
