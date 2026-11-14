@@ -34,7 +34,7 @@ import {
   INITIAL_RADAR_ALERTS,
 } from './data/seedData';
 import { askCatchyTutor, generateCapsuleFromInput } from './lib/gemini';
-import { supabase, signInOrSignUp, signOutUser } from './lib/supabase';
+import { supabase, signInWithGoogle, signInOrSignUp, signOutUser } from './lib/supabase';
 
 type StudentSection = 'home' | 'capsules' | 'library' | 'help' | 'profile';
 
@@ -61,6 +61,7 @@ export default function App() {
   const [emailInput, setEmailInput] = useState('');
   const [passInput, setPassInput] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [section, setSection] = useState<StudentSection>('home');
 
@@ -81,7 +82,7 @@ export default function App() {
 
       if (isMounted) {
         setCurrentUser({
-          name: email.split('@')[0],
+          name: sessionUser.user_metadata?.full_name || email.split('@')[0],
           email,
           role: verifiedRole,
           authProvider: 'email',
@@ -177,7 +178,18 @@ export default function App() {
   const [newType, setNewType] = useState<'summary' | 'exercise' | 'video'>('summary');
   const [newContent, setNewContent] = useState('');
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleGoogleLogin = async () => {
+    setAuthError('');
+    setIsGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      setIsGoogleLoading(false);
+      setAuthError(err?.message || 'שגיאה בהתחברות עם Google.');
+    }
+  };
+
+  const handleEmailLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
     if (!emailInput.trim() || !passInput.trim()) {
@@ -189,7 +201,7 @@ export default function App() {
       await signInOrSignUp(emailInput.trim(), passInput);
     } catch (err: any) {
       setIsLoggingIn(false);
-      setAuthError(err?.message || 'שגיאה בהתחברות. ודא שהסיסמה באורך 6 תוים לפחות.');
+      setAuthError(err?.message || 'שגיאה בהתחברות. ודא שהסיסמה באורך 6 תווים לפחות.');
     }
   };
 
@@ -335,11 +347,50 @@ export default function App() {
               <div className="text-center space-y-2">
                 <h1 className="text-2xl font-extrabold text-slate-900">כניסה למערכת CatchUp</h1>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  הזן אימייל וסיסמה. אם החשבון אינו קיים, הוא ייווצר אוטומטית (חינם לחלוטין וללא אשראי).
+                  התחבר באמצעות Google או באמצעות אימייל וסיסמה.
                 </p>
               </div>
 
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {/* כפתור התחברות עם Google */}
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={isGoogleLoading}
+                className="w-full bg-white hover:bg-slate-50 disabled:opacity-60 text-slate-800 border border-slate-300 font-semibold py-3.5 px-4 rounded-2xl transition flex items-center justify-center gap-3 shadow-xs text-sm"
+              >
+                {isGoogleLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-sky-600" />
+                ) : (
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path
+                      fill="#4285F4"
+                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+                    />
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.3 0 6.08-1.09 8.1-2.96l-3.88-3.05c-1.1.74-2.51 1.18-4.22 1.18-3.25 0-6-2.19-6.98-5.14H1.01v3.14C3.05 21.2 7.24 24 12 24Z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.02 14.03c-.25-.74-.39-1.54-.39-2.36 0-.82.14-1.62.39-2.36V6.17H1.01C.37 7.45 0 8.88 0 10.39s.37 2.94 1.01 4.22l4.01-3.14Z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.79 0 3.41.62 4.68 1.82l3.51-3.51C18.07 1.19 15.3 0 12 0 7.24 0 3.05 2.8 1.01 6.86l4.01 3.14c.98-2.95 3.73-5.25 6.98-5.25Z"
+                    />
+                  </svg>
+                )}
+                <span>{isGoogleLoading ? 'מעביר לגוגל...' : 'המשך עם Google'}</span>
+              </button>
+
+              <div className="flex items-center my-4">
+                <div className="flex-grow border-t border-slate-200"></div>
+                <span className="px-3 text-xs text-slate-400 font-medium">או התחבר באמצעות אימייל</span>
+                <div className="flex-grow border-t border-slate-200"></div>
+              </div>
+
+              {/* טופס התחברות עם אימייל וסיסמה */}
+              <form onSubmit={handleEmailLoginSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">כתובת אימייל</label>
                   <input
@@ -378,7 +429,7 @@ export default function App() {
                   className="w-full bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-semibold py-3.5 px-4 rounded-2xl transition flex items-center justify-center gap-2 shadow-xs text-sm"
                 >
                   {isLoggingIn && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>{isLoggingIn ? 'מתחבר למערכת...' : 'התחבר / הירשם'}</span>
+                  <span>{isLoggingIn ? 'מתחבר למערכת...' : 'התחבר / הירשם עם אימייל'}</span>
                 </button>
               </form>
             </div>

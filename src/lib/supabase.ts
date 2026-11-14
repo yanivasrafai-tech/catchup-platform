@@ -6,11 +6,24 @@ const supabaseAnonKey =
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// התחברות עם Google OAuth אמיתי
+export async function signInWithGoogle() {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin,
+      queryParams: {
+        prompt: 'select_account',
+      },
+    },
+  });
+  if (error) throw error;
+}
+
+// התחברות או הרשמה מהירה באמצעות אימייל וסיסמה
 export async function signInOrSignUp(email: string, password: string) {
-  // נסה להתחבר תחילה
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    // אם המשתמש לא קיים, צור אותו אוטומטית
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
     if (signUpError) throw signUpError;
     return signUpData;
