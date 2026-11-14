@@ -1,11 +1,15 @@
 export type UserRole = 'student' | 'tutor' | 'admin';
+export type AuthProviderType = 'google' | 'moe';
 
 export interface UserProfile {
   name: string;
   email: string;
   role: UserRole;
+  authProvider: AuthProviderType;
   school: string;
-  grade: string;
+  institutionCode?: string;
+  grade?: string;
+  academicInstitution?: string;
   subjects: string[];
   xp: number;
 }
