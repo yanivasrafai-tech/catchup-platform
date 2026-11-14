@@ -1,34 +1,23 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xdycspybjuawwxelrsvc.supabase.co';
+const supabaseAnonKey =
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_vdHcoKGNW573ojfyU6A-jA_PafjMbC6';
 
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('your-project-id')
-);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
-
-export async function triggerRealGoogleOAuth(): Promise<{ ok: boolean; error?: string }> {
-  if (!supabase) {
-    return { ok: false, error: 'local_mode' };
-  }
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: window.location.origin,
-    },
-  });
+export async function signInOrSignUp(email: string, password: string) {
+  // נסה להתחבר תחילה
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    return { ok: false, error: error.message };
+    // אם המשתמש לא קיים, צור אותו אוטומטית
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password });
+    if (signUpError) throw signUpError;
+    return signUpData;
   }
-  return { ok: true };
+  return data;
 }
 
-export async function signOutSupabase(): Promise<void> {
-  if (supabase) {
-    await supabase.auth.signOut();
-  }
+export async function signOutUser() {
+  await supabase.auth.signOut();
 }
