@@ -491,30 +491,35 @@ export default function App() {
     if (!capTopic.trim() || !currentUser) return;
     setIsCreatingCapsule(true);
 
-    const result = await generateCapsuleFromInput(capSubject, capTopic, capNotes, capImage || undefined);
+    try {
+      const result = await generateCapsuleFromInput(capSubject, capTopic, capNotes, capImage || undefined);
 
-    const created: LiveCapsule = {
-      id: `cap-${Date.now()}`,
-      subject: capSubject,
-      topic: capTopic,
-      school: currentUser.school,
-      grade: currentUser.grade || 'י״א',
-      lessonDate: new Date().toLocaleDateString('he-IL'),
-      uploaderName: `${currentUser.name} (${currentUser.role === 'admin' ? 'מנהל/ת' : currentUser.grade || 'תלמיד/ה'})`,
-      sourceType: capImage ? 'photo' : 'voice_note',
-      aiSummary: result.aiSummary,
-      keyFormulas: result.keyFormulas,
-      solvedExample: result.solvedExample,
-      quickQuiz: result.quickQuiz,
-    };
+      const created: LiveCapsule = {
+        id: `cap-${Date.now()}`,
+        subject: capSubject,
+        topic: capTopic,
+        school: currentUser.school,
+        grade: currentUser.grade || 'י״א',
+        lessonDate: new Date().toLocaleDateString('he-IL'),
+        uploaderName: `${currentUser.name} (${currentUser.role === 'admin' ? 'מנהל/ת' : currentUser.grade || 'תלמיד/ה'})`,
+        sourceType: capImage ? 'photo' : 'voice_note',
+        aiSummary: result.aiSummary,
+        keyFormulas: result.keyFormulas,
+        solvedExample: result.solvedExample,
+        quickQuiz: result.quickQuiz,
+      };
 
-    setCapsules([created, ...capsules]);
-    setIsCreatingCapsule(false);
-    setShowUploadModal(false);
-    setCapTopic('');
-    setCapNotes('');
-    setCapImage('');
-    setSelectedCapsule(created);
+      setCapsules([created, ...capsules]);
+      setShowUploadModal(false);
+      setCapTopic('');
+      setCapNotes('');
+      setCapImage('');
+      setSelectedCapsule(created);
+    } catch (err) {
+      console.error('Failed to create capsule:', err);
+    } finally {
+      setIsCreatingCapsule(false);
+    }
   };
 
   const handleAskAI = async (preset?: string) => {
@@ -933,12 +938,12 @@ export default function App() {
 
                     <div className="space-y-4">
                       <div className="p-4 rounded-xl bg-sky-50/60 border border-sky-200/70">
-                        <div className="text-xs font-bold text-sky-800 mb-1">שלב 1 מתוך 4 • מה נלמד היום</div>
-                        <p className="text-sm text-slate-800 leading-relaxed">{selectedCapsule.aiSummary}</p>
+                        <div className="text-xs font-bold text-sky-800 mb-1">ניתוח ופתרון ה-AI</div>
+                        <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">{selectedCapsule.aiSummary}</p>
                       </div>
 
                       <div className="p-4 rounded-xl bg-teal-50/50 border border-teal-200/70">
-                        <div className="text-xs font-bold text-teal-800 mb-2">שלב 2 מתוך 4 • נוסחאות וכללים</div>
+                        <div className="text-xs font-bold text-teal-800 mb-2">נוסחאות וכללים מרכזיים</div>
                         <ul className="space-y-1.5">
                           {selectedCapsule.keyFormulas.map((formula, idx) => (
                             <li key={idx} className="text-sm bg-white border border-teal-100 px-3 py-2 rounded-lg text-slate-800">
@@ -949,18 +954,8 @@ export default function App() {
                       </div>
 
                       <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-                        <div className="text-xs font-bold text-slate-700 mb-1">שלב 3 מתוך 4 • דוגמה פתורה</div>
+                        <div className="text-xs font-bold text-slate-700 mb-1">פתרון מלא שלב אחר שלב</div>
                         <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">{selectedCapsule.solvedExample}</p>
-                      </div>
-
-                      <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/70 space-y-2.5">
-                        <div className="text-xs font-bold text-amber-800">שלב 4 מתוך 4 • בדיקה עצמית</div>
-                        {selectedCapsule.quickQuiz.map((q, idx) => (
-                          <details key={idx} className="bg-white border border-amber-100 rounded-lg p-3 text-sm">
-                            <summary className="font-semibold cursor-pointer text-slate-900">{q.question}</summary>
-                            <p className="mt-2 text-emerald-700 text-sm font-medium">{q.answer}</p>
-                          </details>
-                        ))}
                       </div>
                     </div>
                   </div>
@@ -977,7 +972,7 @@ export default function App() {
                           onClick={() => setSelectedCapsule(cap)}
                           className="mt-4 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition"
                         >
-                          צפה בסיכום (10 דק׳)
+                          צפה בסיכום ובפתרון (AI)
                         </button>
                       </div>
                     ))}
@@ -1505,9 +1500,10 @@ export default function App() {
               <button
                 type="submit"
                 disabled={isCreatingCapsule}
-                className="w-full bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm"
+                className="w-full bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
               >
-                {isCreatingCapsule ? 'מייצר סיכום בעזרת AI...' : 'פרסם סיכום למערכת'}
+                {isCreatingCapsule && <Loader2 className="w-4 h-4 animate-spin" />}
+                <span>{isCreatingCapsule ? 'מייצר סיכום בעזרת AI...' : 'פרסם סיכום למערכת'}</span>
               </button>
             </form>
           </div>
