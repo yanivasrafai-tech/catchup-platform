@@ -262,7 +262,7 @@ export default function App() {
     },
   ]);
 
-  // צאט AI ניהולי מלא למנהל בית הספר
+  // צאט AI ניהולי מלא למנהל
   const [adminChatInput, setAdminChatInput] = useState('');
   const [isAdminChatLoading, setIsAdminChatLoading] = useState(false);
   const [adminChatHistory, setAdminChatHistory] = useState<{ sender: 'user' | 'ai'; text: string }[]>([
@@ -703,7 +703,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
-                if (role === 'student' || isSuperAdmin) setSection('home');
+                if (role === 'student') setSection('home');
                 setSelectedCapsule(null);
               }}
               className="flex items-center gap-2.5 text-right"
@@ -720,7 +720,7 @@ export default function App() {
             </button>
           </div>
 
-          {(role === 'student' || isSuperAdmin) && (
+          {role === 'student' && (
             <nav className="hidden md:flex items-center gap-1">
               {[
                 { id: 'home', label: 'ראשי' },
@@ -747,7 +747,7 @@ export default function App() {
           )}
 
           <div className="flex items-center gap-2">
-            {(role === 'student' || isSuperAdmin) && (
+            {role === 'student' && (
               <button
                 onClick={() => setSection('profile')}
                 title="הפרופיל שלי"
@@ -766,7 +766,7 @@ export default function App() {
               <span className="hidden sm:inline">התנתק</span>
             </button>
 
-            {(role === 'student' || isSuperAdmin) && (
+            {role === 'student' && (
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="md:hidden p-2 rounded-xl bg-slate-100 text-slate-700"
@@ -777,7 +777,7 @@ export default function App() {
           </div>
         </div>
 
-        {(role === 'student' || isSuperAdmin) && mobileMenuOpen && (
+        {role === 'student' && mobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 space-y-1.5 shadow-md">
             {[
               { id: 'home', label: 'ראשי' },
@@ -805,7 +805,8 @@ export default function App() {
       </header>
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {(role === 'student' || isSuperAdmin) && (
+        {/* ----------------- ממשק תלמיד בלבד ----------------- */}
+        {role === 'student' && (
           <>
             {section === 'home' && (
               <div className="space-y-6 sm:space-y-8">
@@ -1291,7 +1292,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ----------------- ממשק מנהל מערכת ראשי (Super Admin) נקי ----------------- */}
+        {/* ----------------- ממשק מנהל מערכת ראשי (Super Admin) בלבד (נקי לחלוטין) ----------------- */}
         {role === 'admin' && isSuperAdmin && (
           <div className="space-y-6">
             <div className="bg-white border border-purple-200 rounded-2xl overflow-hidden shadow-xs">
@@ -1322,7 +1323,7 @@ export default function App() {
                 <Users className="w-5 h-5 text-purple-600" />
                 <h2 className="text-lg font-bold">ניהול הרשאות משתמשים וקישור תפקידים</h2>
               </div>
-              <p className="text-xs text-slate-600">הזן כתובת מייל, בחר האם להגדירו כמנהל בית ספר, סטודנט חונך או תלמיד (כולל גישת תלמיד למנהל):</p>
+              <p className="text-xs text-slate-600">הזן כתובת מייל, בחר האם להגדירו כמנהל בית ספר, סטודנט חונך או תלמיד:</p>
               <form onSubmit={handleGrantPermission} className="grid sm:grid-cols-4 gap-3">
                 <input
                   type="email"
@@ -1339,7 +1340,7 @@ export default function App() {
                   className="p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
                 >
                   <option value="admin">מנהל בית ספר</option>
-                  <option value="student">תלמיד (גם למנהל)</option>
+                  <option value="student">תלמיד</option>
                   <option value="tutor">סטודנט חונך</option>
                 </select>
                 <input
@@ -1390,8 +1391,8 @@ export default function App() {
         )}
       </main>
 
-      {/* וידג'ט צף קבוע בצד ימין למטה עבור תלמידים בכל המסכים */}
-      {(role === 'student' || isSuperAdmin) && (
+      {/* וידג'ט צף קבוע בצד ימין למטה עבור תלמידים בלבד */}
+      {role === 'student' && (
         <div className="fixed bottom-6 right-6 z-50">
           {!isFloatingChatOpen && (
             <button
