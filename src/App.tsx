@@ -18,7 +18,6 @@ import {
   User,
   LogOut,
   Loader2,
-  ShieldCheck,
 } from 'lucide-react';
 import {
   UserRole,
@@ -379,7 +378,7 @@ export default function App() {
                   className="w-full bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-semibold py-3.5 px-4 rounded-2xl transition flex items-center justify-center gap-2 shadow-xs text-sm"
                 >
                   {isLoggingIn && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>{isLoggingIn ? 'מתחבר למערכת...' : 'התכנס / הירשם'}</span>
+                  <span>{isLoggingIn ? 'מתחבר למערכת...' : 'התחבר / הירשם'}</span>
                 </button>
               </form>
             </div>
@@ -618,3 +617,68 @@ export default function App() {
                 <h2 className="text-lg font-bold text-slate-900 mb-3">שאל את Catchy (חונך AI)</h2>
                 <div className="h-60 overflow-y-auto bg-slate-50 border rounded-xl p-4 space-y-3 mb-3">
                   {chatHistory.map((m, idx) => (
+                    <div key={idx} className={`p-3 rounded-2xl text-sm ${m.sender === 'user' ? 'bg-sky-600 text-white mr-8' : 'bg-white border text-slate-800 ml-6'}`}>
+                      {m.text}
+                    </div>
+                  ))}
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); handleAskAI(); }} className="flex gap-2">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="שאל שאלה..."
+                    className="flex-1 p-3 rounded-xl border border-slate-300 text-sm"
+                  />
+                  <button type="submit" className="bg-sky-600 text-white px-5 rounded-xl">
+                    <Send className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {section === 'profile' && (
+              <div className="max-w-lg mx-auto bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
+                <h1 className="text-xl font-bold text-slate-900">הפרופיל שלי</h1>
+                <p className="text-sm text-slate-600">מחובר באמצעות: {currentUser.email}</p>
+                <button onClick={() => setSection('home')} className="w-full bg-sky-600 text-white py-2.5 rounded-xl text-sm font-semibold">
+                  חזרה לדף הראשי
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {role === 'tutor' && (
+          <div className="space-y-4">
+            <h1 className="text-2xl font-bold text-slate-900">מוקד חונכות סטודנטים</h1>
+            {requests.map((req) => (
+              <div key={req.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
+                <div className="font-bold text-slate-900">{req.subject} — {req.topic}</div>
+                <p className="text-xs text-slate-600">{req.studentName} (כיתה {req.studentGrade}) • {req.preferredTime}</p>
+                <div className="p-3 bg-teal-50 rounded-xl text-xs text-slate-800">
+                  <strong>תיק קליני:</strong> {req.clinicalBrief}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {role === 'admin' && (
+          <div className="space-y-4">
+            <h1 className="text-2xl font-bold text-slate-900">רדאר ניהול בי״ס</h1>
+            <div className="grid md:grid-cols-3 gap-4">
+              {radarAlerts.map((alert) => (
+                <div key={alert.id} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-2 shadow-xs">
+                  <div className="font-bold text-slate-900">{alert.topic}</div>
+                  <p className="text-xs text-slate-600">{alert.stuckPercentage}% מתקשים ({alert.studentsAffected} תלמידים)</p>
+                  <p className="text-xs bg-slate-50 p-2.5 rounded-xl">{alert.recommendation}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
