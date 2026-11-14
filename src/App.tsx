@@ -18,6 +18,13 @@ import {
   User,
   LogOut,
   Loader2,
+  Download,
+  Sparkles,
+  ShieldCheck,
+  BookOpen,
+  GraduationCap,
+  Building2,
+  Menu,
 } from 'lucide-react';
 import {
   UserRole,
@@ -39,19 +46,30 @@ import { supabase, signInWithGoogle, signInOrSignUp, signOutUser } from './lib/s
 type StudentSection = 'home' | 'capsules' | 'library' | 'help' | 'profile';
 
 async function resolveVerifiedUserRole(userId: string, email: string): Promise<UserRole> {
-  const { data: profileData } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', userId)
-    .maybeSingle();
+  const lowerEmail = email.toLowerCase().trim();
 
-  if (profileData?.role && ['student', 'tutor', 'admin'].includes(profileData.role)) {
-    return profileData.role as UserRole;
+  // מנהל העל הראשי
+  if (lowerEmail === 'yanivasraf45@gmail.com') {
+    return 'admin';
   }
 
-  const lower = email.toLowerCase();
-  if (lower.endsWith('@edu.gov.il') || lower.includes('admin')) return 'admin';
-  if (lower.endsWith('.ac.il') || lower.includes('tutor')) return 'tutor';
+  // בדיקה מול טבלת approved_staff במסד הנתונים
+  const { data: staffData } = await supabase
+    .from('approved_staff')
+    .select('role')
+    .eq('email', lowerEmail)
+    .maybeSingle();
+
+  if (staffData?.role && ['student', 'tutor', 'admin'].includes(staffData.role)) {
+    return staffData.role as UserRole;
+  }
+
+  // סטודנט חונך מחייב מייל אקדמי
+  if (lowerEmail.endsWith('.ac.il') || lowerEmail.includes('tutor')) {
+    return 'tutor';
+  }
+
+  // ברירת מחדל לתלמיד
   return 'student';
 }
 
@@ -64,6 +82,7 @@ export default function App() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [authError, setAuthError] = useState('');
   const [section, setSection] = useState<StudentSection>('home');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -88,7 +107,7 @@ export default function App() {
           authProvider: 'email',
           school: 'אמית ישיבה תיכונית שדרות',
           grade: verifiedRole === 'student' ? 'י״א' : undefined,
-          academicInstitution: verifiedRole === 'tutor' ? 'סגל אקדמי' : undefined,
+          academicInstitution: verifiedRole === 'tutor' ? 'אוניברסיטה / מכללה אקדמית' : undefined,
           institutionCode: verifiedRole === 'admin' ? '614354' : undefined,
           subjects: ['מתמטיקה 5 יח׳', 'פיזיקה 5 יח׳', 'אנגלית 5 יח׳'],
           xp: 120,
@@ -137,6 +156,17 @@ export default function App() {
     const saved = localStorage.getItem('catchup_v2_favorites');
     return saved ? JSON.parse(saved) : ['mat-1'];
   });
+
+  // ניהול הרשאות למנהל מערכת ראשי
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState<'tutor' | 'admin'>('admin');
+  const [newStaffSchool, setNewStaffSchool] = useState('אמית ישיבה תיכונית שדרות');
+  const [staffMsg, setStaffMsg] = useState('');
+
+  // כלי AI לסטודנט חונך
+  const [tutorAiInput, setTutorAiInput] = useState('');
+  const [tutorAiOutput, setTutorAiOutput] = useState('');
+  const [isTutorAiLoading, setIsTutorAiLoading] = useState(false);
 
   useEffect(() => localStorage.setItem('catchup_v2_materials', JSON.stringify(materials)), [materials]);
   useEffect(() => localStorage.setItem('catchup_v2_capsules', JSON.stringify(capsules)), [capsules]);
@@ -212,6 +242,43 @@ export default function App() {
     setSection('home');
   };
 
+  const handleGrantPermission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaffEmail.trim()) return;
+    setStaffMsg('');
+    const { error } = await supabase.from('approved_staff').upsert({
+      email: newStaffEmail.trim().toLowerCase(),
+      role: newStaffRole,
+      school: newStaffSchool,
+    });
+
+    if (error) {
+      setStaffMsg('שגיאה: ' + error.message);
+    } else {
+      setStaffMsg(`המייל ${newStaffEmail} הוגדר בהצלחה כ-${newStaffRole === 'admin' ? 'מנהל בי״ס' : 'סטודנט חונך'}.`);
+      setNewStaffEmail('');
+    }
+  };
+
+  const handleExportSchoolData = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ school: currentUser?.school, requests, materials, capsules }, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `CatchUp_School_Report_${currentUser?.school || 'Data'}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
+  const handleTutorAiHelp = async () => {
+    if (!tutorAiInput.trim()) return;
+    setIsTutorAiLoading(true);
+    const prompt = `אתה עוזר פדגוגי חכם לסטודנטים חונכים. הכן הסבר קצר של 3 שלבים והמחשה פשוטה עבור התלמיד בנושא הבא: ${tutorAiInput}`;
+    const reply = await askCatchyTutor(prompt, 'חונכות אקדמית');
+    setTutorAiOutput(reply);
+    setIsTutorAiLoading(false);
+  };
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -234,7 +301,7 @@ export default function App() {
       school: currentUser.school,
       grade: currentUser.grade || 'י״א',
       lessonDate: new Date().toLocaleDateString('he-IL'),
-      uploaderName: `${currentUser.name} (${currentUser.grade || 'תלמיד/ה'})`,
+      uploaderName: `${currentUser.name} (${currentUser.role === 'admin' ? 'מנהל/ת' : currentUser.grade || 'תלמיד/ה'})`,
       sourceType: capImage ? 'photo' : 'voice_note',
       aiSummary: result.aiSummary,
       keyFormulas: result.keyFormulas,
@@ -270,9 +337,7 @@ export default function App() {
     const matchingCapsule = capsules.find((c) => c.subject === reqSubject);
     const clinicalBrief =
       `רקע לימודי אוטומטי: ${currentUser.name} (כיתה ${currentUser.grade || 'י״א'}, ${currentUser.school}) ביקש/ה עזרה ב-${reqSubject} בנושא "${reqTopic}". ` +
-      (matchingCapsule
-        ? `ב-${matchingCapsule.lessonDate} הועלה סיכום שיעור מהכיתה בנושא "${matchingCapsule.topic}". `
-        : '') +
+      (matchingCapsule ? `ב-${matchingCapsule.lessonDate} הועלה סיכום שיעור מהכיתה בנושא "${matchingCapsule.topic}". ` : '') +
       `מומלץ להתחיל ישירות מתרגול יסודות הנושא "${reqTopic}" למשך 10 דקות ללא צורך בהסבר מקדים.`;
 
     const newRequest: TutoringRequest = {
@@ -315,7 +380,7 @@ export default function App() {
 
   if (isAuthChecking) {
     return (
-      <div className="min-h-screen bg-[#F4F7FB] flex items-center justify-center" dir="rtl">
+      <div className="min-h-screen bg-[#F4F7FB] flex items-center justify-center p-4" dir="rtl">
         <div className="flex items-center gap-2.5 text-slate-600 text-sm font-medium">
           <Loader2 className="w-5 h-5 animate-spin text-sky-600" />
           <span>מאמת פרטי התחברות...</span>
@@ -334,7 +399,7 @@ export default function App() {
             </div>
             <span className="font-extrabold text-xl text-slate-900 tracking-tight">CatchUp</span>
           </div>
-          <span className="text-xs text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full">
+          <span className="text-xs text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-xs">
             פלטפורמת השלמת פערים לבתי ספר
           </span>
         </div>
@@ -343,15 +408,14 @@ export default function App() {
           <div className="bg-white border border-slate-200/90 rounded-3xl shadow-sm overflow-hidden">
             <div className="h-1.5 bg-gradient-to-l from-sky-500 via-blue-600 to-teal-500" />
 
-            <div className="p-8 space-y-6">
+            <div className="p-6 sm:p-8 space-y-6">
               <div className="text-center space-y-2">
                 <h1 className="text-2xl font-extrabold text-slate-900">כניסה למערכת CatchUp</h1>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  התחבר באמצעות Google או באמצעות אימייל וסיסמה.
+                  התחבר באמצעות Google או באמצעות אימייל וסיסמה. המערכת מזהה אוטומטית את הרשאותיך (מנהל, חונך אקדמי או תלמיד).
                 </p>
               </div>
 
-              {/* כפתור התחברות עם Google */}
               <button
                 type="button"
                 onClick={handleGoogleLogin}
@@ -362,22 +426,10 @@ export default function App() {
                   <Loader2 className="w-5 h-5 animate-spin text-sky-600" />
                 ) : (
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 24c3.3 0 6.08-1.09 8.1-2.96l-3.88-3.05c-1.1.74-2.51 1.18-4.22 1.18-3.25 0-6-2.19-6.98-5.14H1.01v3.14C3.05 21.2 7.24 24 12 24Z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.02 14.03c-.25-.74-.39-1.54-.39-2.36 0-.82.14-1.62.39-2.36V6.17H1.01C.37 7.45 0 8.88 0 10.39s.37 2.94 1.01 4.22l4.01-3.14Z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 4.75c1.79 0 3.41.62 4.68 1.82l3.51-3.51C18.07 1.19 15.3 0 12 0 7.24 0 3.05 2.8 1.01 6.86l4.01 3.14c.98-2.95 3.73-5.25 6.98-5.25Z"
-                    />
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z" />
+                    <path fill="#34A853" d="M12 24c3.3 0 6.08-1.09 8.1-2.96l-3.88-3.05c-1.1.74-2.51 1.18-4.22 1.18-3.25 0-6-2.19-6.98-5.14H1.01v3.14C3.05 21.2 7.24 24 12 24Z" />
+                    <path fill="#FBBC05" d="M5.02 14.03c-.25-.74-.39-1.54-.39-2.36 0-.82.14-1.62.39-2.36V6.17H1.01C.37 7.45 0 8.88 0 10.39s.37 2.94 1.01 4.22l4.01-3.14Z" />
+                    <path fill="#EA4335" d="M12 4.75c1.79 0 3.41.62 4.68 1.82l3.51-3.51C18.07 1.19 15.3 0 12 0 7.24 0 3.05 2.8 1.01 6.86l4.01 3.14c.98-2.95 3.73-5.25 6.98-5.25Z" />
                   </svg>
                 )}
                 <span>{isGoogleLoading ? 'מעביר לגוגל...' : 'המשך עם Google'}</span>
@@ -389,14 +441,13 @@ export default function App() {
                 <div className="flex-grow border-t border-slate-200"></div>
               </div>
 
-              {/* טופס התחברות עם אימייל וסיסמה */}
               <form onSubmit={handleEmailLoginSubmit} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">כתובת אימייל</label>
                   <input
                     type="email"
                     required
-                    placeholder="name@example.com"
+                    placeholder="name@example.com / university.ac.il"
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
                     className="w-full p-3 rounded-xl border border-slate-300 text-sm focus:outline-none focus:border-sky-500"
@@ -444,6 +495,7 @@ export default function App() {
   }
 
   const role = currentUser.role;
+  const isSuperAdmin = currentUser.email.toLowerCase() === 'yanivasraf45@gmail.com';
   const approvedMaterials = materials.filter((m) => m.status === 'approved');
   const visibleMaterials = approvedMaterials.filter((m) => {
     const matchSubj = subjectFilter === 'הכל' || m.subject === subjectFilter;
@@ -461,33 +513,35 @@ export default function App() {
     role === 'student'
       ? { label: `תלמיד/ה • שכבת ${currentUser.grade || 'י״א'}`, classes: 'bg-sky-50 text-sky-700 border-sky-200', logoBg: 'bg-sky-600' }
       : role === 'tutor'
-      ? { label: 'סטודנט חונך', classes: 'bg-teal-50 text-teal-700 border-teal-200', logoBg: 'bg-teal-600' }
-      : { label: 'הנהלת בית ספר', classes: 'bg-indigo-50 text-indigo-700 border-indigo-200', logoBg: 'bg-indigo-600' };
+      ? { label: 'סטודנט חונך אקדמי', classes: 'bg-teal-50 text-teal-700 border-teal-200', logoBg: 'bg-teal-600' }
+      : { label: isSuperAdmin ? 'מנהל מערכת ראשי (Super Admin)' : `הנהלת בי״ס • ${currentUser.school}`, classes: 'bg-indigo-50 text-indigo-700 border-indigo-200', logoBg: 'bg-indigo-600' };
 
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-slate-900 flex flex-col" dir="rtl">
       <header className="bg-white border-b border-slate-200/90 sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          <button
-            onClick={() => {
-              if (role === 'student') setSection('home');
-              setSelectedCapsule(null);
-            }}
-            className="flex items-center gap-2.5 text-right"
-          >
-            <div className={`w-9 h-9 rounded-xl ${roleBadge.logoBg} text-white font-extrabold text-lg flex items-center justify-center shadow-xs`}>
-              C
-            </div>
-            <div>
-              <span className="font-extrabold text-lg text-slate-900 tracking-tight">CatchUp</span>
-              <span className={`hidden md:inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full border mr-2.5 ${roleBadge.classes}`}>
-                {roleBadge.label}
-              </span>
-            </div>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                if (role === 'student') setSection('home');
+                setSelectedCapsule(null);
+              }}
+              className="flex items-center gap-2.5 text-right"
+            >
+              <div className={`w-9 h-9 rounded-xl ${roleBadge.logoBg} text-white font-extrabold text-lg flex items-center justify-center shadow-xs`}>
+                C
+              </div>
+              <div>
+                <span className="font-extrabold text-lg text-slate-900 tracking-tight">CatchUp</span>
+                <span className={`hidden md:inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full border mr-2.5 ${roleBadge.classes}`}>
+                  {roleBadge.label}
+                </span>
+              </div>
+            </button>
+          </div>
 
           {role === 'student' && (
-            <nav className="flex items-center gap-1 sm:gap-1.5">
+            <nav className="hidden md:flex items-center gap-1">
               {[
                 { id: 'home', label: 'ראשי' },
                 { id: 'capsules', label: 'שיעורים מהכיתה' },
@@ -517,10 +571,10 @@ export default function App() {
               <button
                 onClick={() => setSection('profile')}
                 title="הפרופיל שלי"
-                className="flex items-center gap-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-xl"
+                className="hidden sm:flex items-center gap-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1.5 rounded-xl"
               >
                 <User className="w-3.5 h-3.5 text-sky-600" />
-                <span className="hidden sm:inline">{currentUser.name}</span>
+                <span>{currentUser.name}</span>
               </button>
             )}
 
@@ -529,23 +583,59 @@ export default function App() {
               className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-3 py-1.5 rounded-xl transition"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span>התנתק</span>
+              <span className="hidden sm:inline">התנתק</span>
             </button>
+
+            {role === 'student' && (
+              <button
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="md:hidden p-2 rounded-xl bg-slate-100 text-slate-700"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
+
+        {/* תפריט נשלף לנייד עבור תלמידים */}
+        {role === 'student' && mobileMenuOpen && (
+          <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 space-y-1.5 shadow-md">
+            {[
+              { id: 'home', label: 'ראשי' },
+              { id: 'capsules', label: 'שיעורים מהכיתה' },
+              { id: 'library', label: 'סיכומים ותרגילים' },
+              { id: 'help', label: 'עזרה אישית' },
+              { id: 'profile', label: 'הפרופיל שלי' },
+            ].map((nav) => (
+              <button
+                key={nav.id}
+                onClick={() => {
+                  setSection(nav.id as StudentSection);
+                  setSelectedCapsule(null);
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full text-right px-3 py-2 rounded-xl text-sm font-medium transition ${
+                  section === nav.id ? 'bg-sky-50 text-sky-700 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {nav.label}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {role === 'student' && (
           <>
             {section === 'home' && (
-              <div className="space-y-8">
+              <div className="space-y-6 sm:space-y-8">
                 <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
                   <div className="h-1.5 bg-sky-500" />
-                  <div className="p-6 sm:p-8">
+                  <div className="p-5 sm:p-8">
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div>
-                        <h1 className="text-2xl font-bold text-slate-900">שלום {currentUser.name} 👋</h1>
+                        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">שלום {currentUser.name} 👋</h1>
                         <p className="text-slate-600 text-sm sm:text-base mt-1">
                           בחר פעולה אחת פשוטה כדי להשלים חומר או להתקדם בלימודים:
                         </p>
@@ -627,109 +717,588 @@ export default function App() {
 
             {section === 'capsules' && (
               <div className="space-y-6">
-                <h1 className="text-2xl font-bold text-slate-900">השלמת שיעורים מהכיתה</h1>
-                <div className="grid md:grid-cols-2 gap-4">
-                  {capsules.map((cap) => (
-                    <div key={cap.id} className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs">
-                      <div>
-                        <div className="text-xs text-sky-700 font-semibold mb-1">{cap.subject} • {cap.lessonDate}</div>
-                        <h3 className="font-bold text-lg text-slate-900 mb-2">{cap.topic}</h3>
-                        <p className="text-sm text-slate-600 line-clamp-2">{cap.aiSummary}</p>
-                      </div>
-                      <button
-                        onClick={() => setSelectedCapsule(cap)}
-                        className="mt-4 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 py-2 rounded-xl"
-                      >
-                        צפה בסיכום
-                      </button>
-                    </div>
-                  ))}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-900">השלמת שיעורים מהכיתה</h1>
+                    <p className="text-sm text-slate-600">בחר שיעור שפספסת ולמד אותו ב-4 שלבים קצרים.</p>
+                  </div>
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs"
+                  >
+                    <Camera className="w-4 h-4" />
+                    העלה צילום לוח
+                  </button>
                 </div>
+
+                {selectedCapsule ? (
+                  <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 space-y-6 shadow-xs">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                      <button
+                        onClick={() => setSelectedCapsule(null)}
+                        className="text-sm text-slate-600 hover:text-slate-900 flex items-center gap-1 font-medium"
+                      >
+                        <ArrowRight className="w-4 h-4" />
+                        חזרה לרשימת השיעורים
+                      </button>
+                      <span className="text-xs font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-lg">
+                        {selectedCapsule.subject} • {selectedCapsule.lessonDate}
+                      </span>
+                    </div>
+
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-900">{selectedCapsule.topic}</h2>
+                      <p className="text-xs text-slate-500 mt-1">הוכן ע״י {selectedCapsule.uploaderName}</p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-xl bg-sky-50/60 border border-sky-200/70">
+                        <div className="text-xs font-bold text-sky-800 mb-1">שלב 1 מתוך 4 • מה נלמד היום</div>
+                        <p className="text-sm text-slate-800 leading-relaxed">{selectedCapsule.aiSummary}</p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-teal-50/50 border border-teal-200/70">
+                        <div className="text-xs font-bold text-teal-800 mb-2">שלב 2 מתוך 4 • נוסחאות וכללים</div>
+                        <ul className="space-y-1.5">
+                          {selectedCapsule.keyFormulas.map((formula, idx) => (
+                            <li key={idx} className="text-sm bg-white border border-teal-100 px-3 py-2 rounded-lg text-slate-800">
+                              {formula}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80">
+                        <div className="text-xs font-bold text-slate-700 mb-1">שלב 3 מתוך 4 • דוגמה פתורה</div>
+                        <p className="text-sm text-slate-800 whitespace-pre-line leading-relaxed">{selectedCapsule.solvedExample}</p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/70 space-y-2.5">
+                        <div className="text-xs font-bold text-amber-800">שלב 4 מתוך 4 • בדיקה עצמית</div>
+                        {selectedCapsule.quickQuiz.map((q, idx) => (
+                          <details key={idx} className="bg-white border border-amber-100 rounded-lg p-3 text-sm">
+                            <summary className="font-semibold cursor-pointer text-slate-900">{q.question}</summary>
+                            <p className="mt-2 text-emerald-700 text-sm font-medium">{q.answer}</p>
+                          </details>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {capsules.map((cap) => (
+                      <div key={cap.id} className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col justify-between shadow-xs">
+                        <div>
+                          <div className="text-xs text-sky-700 font-semibold mb-1">{cap.subject} • {cap.lessonDate}</div>
+                          <h3 className="font-bold text-lg text-slate-900 mb-2">{cap.topic}</h3>
+                          <p className="text-sm text-slate-600 line-clamp-2">{cap.aiSummary}</p>
+                        </div>
+                        <button
+                          onClick={() => setSelectedCapsule(cap)}
+                          className="mt-4 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition"
+                        >
+                          צפה בסיכום (10 דק׳)
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
             {section === 'library' && (
               <div className="space-y-6">
-                <h1 className="text-2xl font-bold text-slate-900">סיכומים ותרגילים</h1>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">סיכומים ותרגילים לבגרות</h1>
+                  <p className="text-sm text-slate-600">סנן לפי מקצוע ובחר נושא לתרגול</p>
+                </div>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row gap-3 shadow-xs">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="חפש נושא..."
+                      className="w-full pr-10 pl-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    {['הכל', 'מתמטיקה 5 יח׳', 'פיזיקה 5 יח׳', 'אנגלית 5 יח׳'].map((subj) => (
+                      <button
+                        key={subj}
+                        onClick={() => setSubjectFilter(subj)}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+                          subjectFilter === subj ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {subj}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="space-y-4">
-                  {visibleMaterials.map((item) => (
-                    <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-3 shadow-xs">
-                      <div className="text-xs text-sky-700 font-semibold">{item.subject} • {item.topic}</div>
-                      <h3 className="text-lg font-bold text-slate-900">{item.title}</h3>
-                      <p className="text-sm text-slate-800 whitespace-pre-line">{item.content}</p>
-                    </div>
-                  ))}
+                  {visibleMaterials.map((item) => {
+                    const isDone = progressMap[item.id] === 'completed';
+                    const isFav = favorites.includes(item.id);
+                    const isOpen = Boolean(openSolutions[item.id]);
+
+                    return (
+                      <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <span className="text-xs font-semibold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md">{item.subject}</span>
+                            <h3 className="text-lg font-bold text-slate-900 mt-1">{item.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() =>
+                                setFavorites((prev) => (prev.includes(item.id) ? prev.filter((x) => x !== item.id) : [...prev, item.id]))
+                              }
+                              className={`p-2 rounded-xl border text-xs ${isFav ? 'bg-amber-50 border-amber-200 text-amber-500' : 'border-slate-200 text-slate-400'}`}
+                            >
+                              <Star className="w-4 h-4 fill-current" />
+                            </button>
+                            <button
+                              onClick={() =>
+                                setProgressMap((prev) => ({ ...prev, [item.id]: isDone ? 'in_progress' : 'completed' }))
+                              }
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition ${
+                                isDone ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                              {isDone ? 'הושלם' : 'סמן כהושלם'}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/70 text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                          {item.content}
+                        </div>
+
+                        {item.solutionSteps && (
+                          <div>
+                            <button
+                              onClick={() => setOpenSolutions((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
+                              className="text-sm font-semibold text-sky-700 hover:text-sky-900 flex items-center gap-1"
+                            >
+                              {isOpen ? <><ChevronUp className="w-4 h-4" /> הסתר פתרון</> : <><ChevronDown className="w-4 h-4" /> הצג פתרון שלב-אחר-שלב</>}
+                            </button>
+                            {isOpen && (
+                              <div className="mt-3 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 text-sm text-slate-800 whitespace-pre-line leading-relaxed">
+                                {item.solutionSteps}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
 
             {section === 'help' && (
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
-                <h2 className="text-lg font-bold text-slate-900 mb-3">שאל את Catchy (חונך AI)</h2>
-                <div className="h-60 overflow-y-auto bg-slate-50 border rounded-xl p-4 space-y-3 mb-3">
-                  {chatHistory.map((m, idx) => (
-                    <div key={idx} className={`p-3 rounded-2xl text-sm ${m.sender === 'user' ? 'bg-sky-600 text-white mr-8' : 'bg-white border text-slate-800 ml-6'}`}>
-                      {m.text}
+              <div className="grid lg:grid-cols-2 gap-6">
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between space-y-4 shadow-xs">
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h2 className="text-lg font-bold text-slate-900">1. שאל את Catchy (חונך AI)</h2>
+                        <p className="text-xs text-slate-500">הסברים מיידיים בעברית פשוטה</p>
+                      </div>
+                      <select
+                        value={chatSubject}
+                        onChange={(e) => setChatSubject(e.target.value)}
+                        className="text-xs font-medium border border-slate-200 rounded-xl px-2.5 py-1.5 bg-sky-50 text-sky-900"
+                      >
+                        <option>מתמטיקה 5 יח׳</option>
+                        <option>פיזיקה 5 יח׳</option>
+                        <option>אנגלית 5 יח׳</option>
+                      </select>
                     </div>
-                  ))}
+
+                    <div className="h-64 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                      {chatHistory.map((m, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-2xl text-sm whitespace-pre-line leading-relaxed ${
+                            m.sender === 'user' ? 'bg-sky-600 text-white mr-8' : 'bg-white border border-slate-200 text-slate-800 ml-6'
+                          }`}
+                        >
+                          {m.text}
+                        </div>
+                      ))}
+                      {isChatLoading && <div className="text-xs text-slate-400">כותב תשובה...</div>}
+                    </div>
+                  </div>
+
+                  <form onSubmit={(e) => { e.preventDefault(); handleAskAI(); }} className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      placeholder="שאל שאלה בלשון חופשית..."
+                      className="flex-1 text-sm px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-sky-500"
+                    />
+                    <button type="submit" className="bg-sky-600 hover:bg-sky-700 text-white px-4 rounded-xl flex items-center justify-center">
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </form>
                 </div>
-                <form onSubmit={(e) => { e.preventDefault(); handleAskAI(); }} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    placeholder="שאל שאלה..."
-                    className="flex-1 p-3 rounded-xl border border-slate-300 text-sm"
-                  />
-                  <button type="submit" className="bg-sky-600 text-white px-5 rounded-xl">
-                    <Send className="w-4 h-4" />
-                  </button>
-                </form>
+
+                <div className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">2. בקש שיעור עם סטודנט חונך</h2>
+                    <p className="text-xs text-slate-500 mt-0.5">המערכת תצרף לסטודנט רקע אוטומטי על הפערים שלך.</p>
+                  </div>
+
+                  <form onSubmit={handleSendTutorRequest} className="space-y-3.5">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">מקצוע</label>
+                      <select
+                        value={reqSubject}
+                        onChange={(e) => setReqSubject(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
+                      >
+                        <option>מתמטיקה 5 יח׳</option>
+                        <option>פיזיקה 5 יח׳</option>
+                        <option>אנגלית 5 יח׳</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">נושא ממוקד</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="למשל: אינטגרלים"
+                        value={reqTopic}
+                        onChange={(e) => setReqTopic(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">מועדף</label>
+                      <input
+                        type="text"
+                        required
+                        value={reqTime}
+                        onChange={(e) => setReqTime(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">טלפון / וואטסאפ</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="050-0000000"
+                        value={reqContact}
+                        onChange={(e) => setReqContact(e.target.value)}
+                        className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                      />
+                    </div>
+
+                    <button type="submit" className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-xl text-sm transition">
+                      שלח בקשה לסטודנט החונך
+                    </button>
+                  </form>
+
+                  {createdClinicalPreview && (
+                    <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-xs text-slate-800 space-y-1">
+                      <div className="font-bold text-teal-900">הבקשה נשלחה בהצלחה!</div>
+                      <p className="leading-relaxed">{createdClinicalPreview}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {section === 'profile' && (
               <div className="max-w-lg mx-auto bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
-                <h1 className="text-xl font-bold text-slate-900">הפרופיל שלי</h1>
+                <h1 className="text-xl font-bold text-slate-900">הפרופיל האישי</h1>
                 <p className="text-sm text-slate-600">מחובר באמצעות: {currentUser.email}</p>
+                <div className="p-3 bg-sky-50 rounded-xl text-xs text-sky-900 font-medium">
+                  מוסד לימודים: {currentUser.school} • דרגת פעילות: {currentUser.xp} XP
+                </div>
                 <button onClick={() => setSection('home')} className="w-full bg-sky-600 text-white py-2.5 rounded-xl text-sm font-semibold">
-                  חזרה לדף הראשי
+                  חזרה למסך הראשי
                 </button>
               </div>
             )}
           </>
         )}
 
+        {/* ----------------- ממשק סטודנט חונך ----------------- */}
         {role === 'tutor' && (
-          <div className="space-y-4">
-            <h1 className="text-2xl font-bold text-slate-900">מוקד חונכות סטודנטים</h1>
-            {requests.map((req) => (
-              <div key={req.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-2">
-                <div className="font-bold text-slate-900">{req.subject} — {req.topic}</div>
-                <p className="text-xs text-slate-600">{req.studentName} (כיתה {req.studentGrade}) • {req.preferredTime}</p>
-                <div className="p-3 bg-teal-50 rounded-xl text-xs text-slate-800">
-                  <strong>תיק קליני:</strong> {req.clinicalBrief}
-                </div>
+          <div className="space-y-6">
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="h-1.5 bg-teal-600" />
+              <div className="p-6">
+                <h1 className="text-2xl font-bold text-slate-900">שלום {currentUser.name} • מוקד חונכות אקדמית</h1>
+                <p className="text-sm text-slate-600 mt-1">
+                  כאן תוכל לראות את כל בקשות התלמידים, להשתבץ לשיעורים ולהשתמש בכלי ה-AI כדי להכין את ההסבר בצורה הטובה ביותר.
+                </p>
               </div>
-            ))}
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h2 className="text-lg font-bold text-slate-900">בקשות תלמידים ממתינות לחונך</h2>
+                {requests.map((req) => (
+                  <div key={req.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-teal-800 bg-teal-50 px-2.5 py-1 rounded-lg">{req.subject}</span>
+                      <span className="text-xs font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg">
+                        {req.status === 'open' ? 'ממתינה לחונך' : 'בטיפול'}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-900">{req.topic}</h3>
+                      <p className="text-xs text-slate-500">{req.studentName} (כיתה {req.studentGrade}) • מועד: {req.preferredTime}</p>
+                    </div>
+                    <div className="p-3 bg-teal-50/60 rounded-xl text-xs text-slate-800">
+                      <strong>תיק קליני (רקע):</strong> {req.clinicalBrief}
+                    </div>
+                    <div className="pt-2 flex justify-between items-center text-xs">
+                      <span>טלפון: {req.studentContact}</span>
+                      <button
+                        onClick={() =>
+                          setRequests((prev) => prev.map((r) => (r.id === req.id ? { ...r, status: 'in_progress' } : r)))
+                        }
+                        className="bg-teal-600 hover:bg-teal-700 text-white font-semibold px-4 py-2 rounded-xl transition"
+                      >
+                        קח בקשה לטיפול
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* כלי AI לסטודנט להכנת חומרים */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+                <div className="flex items-center gap-2 text-teal-700">
+                  <Sparkles className="w-5 h-5" />
+                  <h2 className="text-lg font-bold text-slate-900">כלי AI חכם להעברת החומר לתלמיד</h2>
+                </div>
+                <p className="text-xs text-slate-600">הזן נושא לימודי שאתה הולך ללמד, וקבל מיד מבנה הסבר מומלץ והמחשה פשוטה:</p>
+                <input
+                  type="text"
+                  placeholder="למשל: חוק השני של ניוטון"
+                  value={tutorAiInput}
+                  onChange={(e) => setTutorAiInput(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 text-sm"
+                />
+                <button
+                  onClick={handleTutorAiHelp}
+                  disabled={isTutorAiLoading}
+                  className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
+                >
+                  {isTutorAiLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  <span>צור מבנה הסבר לחונכות</span>
+                </button>
+                {tutorAiOutput && (
+                  <div className="p-4 rounded-xl bg-slate-50 border text-xs text-slate-800 whitespace-pre-line leading-relaxed">
+                    {tutorAiOutput}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
+        {/* ----------------- ממשק מנהל (מנהל ראשי או מנהל בי״ס) ----------------- */}
         {role === 'admin' && (
-          <div className="space-y-4">
-            <h1 className="text-2xl font-bold text-slate-900">רדאר ניהול בי״ס</h1>
+          <div className="space-y-6">
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="h-1.5 bg-indigo-600" />
+              <div className="p-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">
+                    {isSuperAdmin ? 'ממשק מנהל מערכת ראשי (Super Admin)' : `רדאר ניהול • ${currentUser.school}`}
+                  </h1>
+                  <p className="text-sm text-slate-600 mt-1">
+                    {isSuperAdmin
+                      ? 'שליטה מלאה בכל משתמשי המערכת, מתן הרשאות וניהול תכנים גלובליים.'
+                      : 'צפייה בנתוני התלמידים בבית הספר שלך בלבד, ייצוא דוחות וייעוץ AI חכם.'}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleExportSchoolData}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs"
+                  >
+                    ייצא נתונים לקובץ (Export)
+                  </button>
+                  <button
+                    onClick={() => setShowUploadModal(true)}
+                    className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs"
+                  >
+                    העלה חומר לימוד חדש
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* ניהול הרשאות למנהל ראשי */}
+            {isSuperAdmin && (
+              <div className="bg-white border border-indigo-200 rounded-2xl p-6 shadow-xs space-y-4">
+                <div className="flex items-center gap-2 text-indigo-900">
+                  <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                  <h2 className="text-lg font-bold">הענקת הרשאות למנהלי בתי ספר וסטודנטים חונכים</h2>
+                </div>
+                <p className="text-xs text-slate-600">הזן כתובת מייל של מנהל בית ספר או סטודנט חונך ובחר את תפקידם במערכת:</p>
+                <form onSubmit={handleGrantPermission} className="grid sm:grid-cols-4 gap-3">
+                  <input
+                    type="email"
+                    required
+                    placeholder="user@example.com"
+                    value={newStaffEmail}
+                    onChange={(e) => setNewStaffEmail(e.target.value)}
+                    className="p-2.5 rounded-xl border border-slate-300 text-sm"
+                    dir="ltr"
+                  />
+                  <select
+                    value={newStaffRole}
+                    onChange={(e) => setNewStaffRole(e.target.value as 'tutor' | 'admin')}
+                    className="p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
+                  >
+                    <option value="admin">מנהל בית ספר</option>
+                    <option value="tutor">סטודנט חונך</option>
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="שם בית הספר"
+                    value={newStaffSchool}
+                    onChange={(e) => setNewStaffSchool(e.target.value)}
+                    className="p-2.5 rounded-xl border border-slate-300 text-sm"
+                  />
+                  <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm">
+                    שמור הרשאה
+                  </button>
+                </form>
+                {staffMsg && <p className="text-xs font-medium text-emerald-700">{staffMsg}</p>}
+              </div>
+            )}
+
+            {/* AI ייעוץ מנהלים */}
+            <div className="bg-gradient-to-l from-indigo-900 to-indigo-800 text-white rounded-2xl p-6 shadow-md space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-amber-300" />
+                <h2 className="text-lg font-bold">ייעוץ AI ניהולי לבית הספר</h2>
+              </div>
+              <p className="text-xs text-indigo-100 leading-relaxed">
+                מערכת ה-AI ניתחה את נתוני התלמידים ב-{currentUser.school}: זוהה קושי בטריגונומטריה ובמעגלי חשמל. מומלץ להקצות 2 שעות תגבור ממוקדות ביום רביעי הקרוב ולפרסם את סיכומי 10 הדקות החדשים לקבוצות הווטסאפ השכבתיות.
+              </p>
+            </div>
+
             <div className="grid md:grid-cols-3 gap-4">
               {radarAlerts.map((alert) => (
-                <div key={alert.id} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-2 shadow-xs">
-                  <div className="font-bold text-slate-900">{alert.topic}</div>
-                  <p className="text-xs text-slate-600">{alert.stuckPercentage}% מתקשים ({alert.studentsAffected} תלמידים)</p>
-                  <p className="text-xs bg-slate-50 p-2.5 rounded-xl">{alert.recommendation}</p>
+                <div key={alert.id} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-indigo-800 bg-indigo-50 px-2.5 py-0.5 rounded-md">{alert.subject}</span>
+                    <span className="font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md">{alert.stuckPercentage}% מתקשים</span>
+                  </div>
+                  <h3 className="font-bold text-slate-900">{alert.topic}</h3>
+                  <p className="text-xs text-slate-500">{alert.studentsAffected} תלמידים מושפעים</p>
+                  <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl leading-relaxed">{alert.recommendation}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-3">
+              <h2 className="text-lg font-bold text-slate-900">ניהול תכנים ואישור חומרי לימוד</h2>
+              <div className="divide-y divide-slate-100">
+                {materials.map((m) => (
+                  <div key={m.id} className="py-3 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs text-slate-500">{m.subject} • סטטוס: <strong className="text-emerald-600">מאושר</strong></div>
+                      <div className="text-sm font-semibold text-slate-900">{m.title}</div>
+                    </div>
+                    <button
+                      onClick={() => setMaterials((prev) => prev.filter((x) => x.id !== m.id))}
+                      className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:text-rose-600"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* מודאל העלאת חומר לימוד או שיעור */}
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">העלאת חומר לימוד או סיכום לכיתה</h3>
+              <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCreateCapsule} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">מקצוע</label>
+                <select
+                  value={capSubject}
+                  onChange={(e) => setCapSubject(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
+                >
+                  <option>מתמטיקה 5 יח׳</option>
+                  <option>פיזיקה 5 יח׳</option>
+                  <option>אנגלית 5 יח׳</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">נושא השיעור</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="למשל: נגזרות של פונקציות מעריכיות"
+                  value={capTopic}
+                  onChange={(e) => setCapTopic(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">צילום לוח / מחברת (אופציונלי)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="w-full text-xs text-slate-600 file:ml-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:font-semibold file:bg-sky-50 file:text-sky-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">הערות או סיכום קצר</label>
+                <textarea
+                  rows={3}
+                  placeholder="מה הוסבר היום בכיתה?"
+                  value={capNotes}
+                  onChange={(e) => setCapNotes(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isCreatingCapsule}
+                className="w-full bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm"
+              >
+                {isCreatingCapsule ? 'מייצר סיכום בעזרת AI...' : 'פרסם סיכום למערכת'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
