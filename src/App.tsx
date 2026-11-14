@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import {
   UserRole,
-  AuthProviderType,
   UserProfile,
   StudyMaterial,
   LiveCapsule,
@@ -60,13 +59,11 @@ function detectRoleFromEmail(email: string): UserRole {
 }
 
 export default function App() {
-  // משתמש מחובר (null = מסך התחברות)
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('catchup_auth_user');
     return saved ? JSON.parse(saved) : null;
   });
 
-  // שלבי התחברות (Google / משרד החינוך)
   const [authModal, setAuthModal] = useState<'none' | 'google' | 'moe'>('none');
   const [loginName, setLoginName] = useState('');
   const [loginEmail, setLoginEmail] = useState('');
@@ -79,7 +76,6 @@ export default function App() {
   const [moeUserType, setMoeUserType] = useState<'student' | 'admin'>('student');
   const [authError, setAuthError] = useState('');
 
-  // סנכרון מול Supabase Auth אמיתי (כאשר מוגדר ב-.env)
   useEffect(() => {
     if (!supabase) return;
 
@@ -88,7 +84,7 @@ export default function App() {
       if (user && !currentUser) {
         const email = user.email || '';
         const detectedRole = detectRoleFromEmail(email);
-        const profileFromOAuth: UserProfile = {
+        setCurrentUser({
           name: user.user_metadata?.full_name || email.split('@')[0],
           email,
           role: detectedRole,
@@ -97,8 +93,7 @@ export default function App() {
           grade: 'י״א',
           subjects: ['מתמטיקה 5 יח׳', 'פיזיקה 5 יח׳', 'אנגלית 5 יח׳'],
           xp: 120,
-        };
-        setCurrentUser(profileFromOAuth);
+        });
       }
     });
 
@@ -134,10 +129,8 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // ניווט בתוך ממשק תלמיד
   const [section, setSection] = useState<StudentSection>('home');
 
-  // נתוני המערכת
   const [materials, setMaterials] = useState<StudyMaterial[]>(() => {
     const saved = localStorage.getItem('catchup_v2_materials');
     return saved ? JSON.parse(saved) : INITIAL_MATERIALS;
@@ -171,12 +164,10 @@ export default function App() {
   useEffect(() => localStorage.setItem('catchup_v2_progress', JSON.stringify(progressMap)), [progressMap]);
   useEffect(() => localStorage.setItem('catchup_v2_favorites', JSON.stringify(favorites)), [favorites]);
 
-  // ספריית לימוד
   const [subjectFilter, setSubjectFilter] = useState<string>('הכל');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [openSolutions, setOpenSolutions] = useState<Record<string, boolean>>({});
 
-  // קפסולות שיעור חיות
   const [selectedCapsule, setSelectedCapsule] = useState<LiveCapsule | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [capSubject, setCapSubject] = useState('מתמטיקה 5 יח׳');
@@ -185,7 +176,6 @@ export default function App() {
   const [capImage, setCapImage] = useState('');
   const [isCreatingCapsule, setIsCreatingCapsule] = useState(false);
 
-  // חונך AI (Catchy)
   const [chatSubject, setChatSubject] = useState('מתמטיקה 5 יח׳');
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
@@ -196,21 +186,18 @@ export default function App() {
     },
   ]);
 
-  // בקשת שיעור עם סטודנט + תיק קליני אוטומטי
   const [reqSubject, setReqSubject] = useState('מתמטיקה 5 יח׳');
   const [reqTopic, setReqTopic] = useState('');
   const [reqTime, setReqTime] = useState('היום אחה״צ (17:00–19:00)');
   const [reqContact, setReqContact] = useState('052-3688248');
   const [createdClinicalPreview, setCreatedClinicalPreview] = useState<string | null>(null);
 
-  // ניהול תוכן (מנהל)
   const [newTitle, setNewTitle] = useState('');
   const [newSubject, setNewSubject] = useState('מתמטיקה 5 יח׳');
   const [newTopic, setNewTopic] = useState('');
   const [newType, setNewType] = useState<'summary' | 'exercise' | 'video'>('summary');
   const [newContent, setNewContent] = useState('');
 
-  // התחלת תהליך Google
   const handleStartGoogleLogin = async () => {
     setAuthError('');
     if (isSupabaseConfigured) {
@@ -220,7 +207,6 @@ export default function App() {
     setAuthModal('google');
   };
 
-  // השלמת התחברות Google + אימות סוג משתמש
   const handleCompleteGoogleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -233,7 +219,7 @@ export default function App() {
       return;
     }
 
-    const user: UserProfile = {
+    setCurrentUser({
       name: loginName.trim(),
       email: loginEmail.trim(),
       role: loginRoleChoice,
@@ -244,14 +230,11 @@ export default function App() {
       academicInstitution: loginRoleChoice === 'tutor' ? loginAcademic : undefined,
       subjects: ['מתמטיקה 5 יח׳', 'פיזיקה 5 יח׳', 'אנגלית 5 יח׳'],
       xp: 150,
-    };
-
-    setCurrentUser(user);
+    });
     setAuthModal('none');
     setSection('home');
   };
 
-  // השלמת הזדהות אחידה של משרד החינוך
   const handleCompleteMoeLogin = (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -264,7 +247,7 @@ export default function App() {
       return;
     }
 
-    const user: UserProfile = {
+    setCurrentUser({
       name: loginName.trim(),
       email: `${moeIdNumber.trim()}@edu.gov.il`,
       role: moeUserType,
@@ -274,14 +257,11 @@ export default function App() {
       grade: moeUserType === 'student' ? loginGrade : undefined,
       subjects: ['מתמטיקה 5 יח׳', 'פיזיקה 5 יח׳', 'אנגלית 5 יח׳'],
       xp: 150,
-    };
-
-    setCurrentUser(user);
+    });
     setAuthModal('none');
     setSection('home');
   };
 
-  // התנתקות
   const handleLogout = async () => {
     await signOutSupabase();
     setCurrentUser(null);
@@ -390,13 +370,9 @@ export default function App() {
     setNewContent('');
   };
 
-  // =========================================================================
-  // מסך כניסה (LOGIN SCREEN) — Google + הזדהות משרד החינוך + הפרדת יוזרים
-  // =========================================================================
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#F4F7FB] text-slate-900 flex flex-col justify-between p-4 sm:p-6" dir="rtl">
-        {/* סרגל עליון מינימלי */}
         <div className="max-w-4xl w-full mx-auto flex items-center justify-between pt-2">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-sky-600 text-white font-extrabold text-lg flex items-center justify-center shadow-sm">
@@ -409,10 +385,8 @@ export default function App() {
           </span>
         </div>
 
-        {/* כרטיס התחברות מרכזי רגוע וברור */}
         <div className="max-w-md w-full mx-auto my-auto py-8">
           <div className="bg-white border border-slate-200/90 rounded-3xl shadow-sm overflow-hidden">
-            {/* פס צבע עדין למעלה */}
             <div className="h-1.5 bg-gradient-to-l from-sky-500 via-blue-600 to-teal-500" />
 
             <div className="p-7 sm:p-8 space-y-6">
@@ -423,9 +397,7 @@ export default function App() {
                 </p>
               </div>
 
-              {/* כפתורי התחברות רשמיים */}
               <div className="space-y-3">
-                {/* כפתור 1: Google */}
                 <button
                   type="button"
                   onClick={handleStartGoogleLogin}
@@ -452,7 +424,6 @@ export default function App() {
                   <span>המשך עם Google</span>
                 </button>
 
-                {/* כפתור 2: הזדהות אחידה של משרד החינוך */}
                 <button
                   type="button"
                   onClick={() => {
@@ -466,7 +437,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* הסבר רגוע על הפרדת 3 סוגי המשתמשים */}
               <div className="pt-4 border-t border-slate-100 space-y-2.5">
                 <div className="text-xs font-semibold text-slate-500 text-center">
                   המערכת מפרידה אוטומטית בין 3 סביבות עבודה:
@@ -493,19 +463,15 @@ export default function App() {
           </div>
         </div>
 
-        {/* פוטר נקי */}
         <div className="text-center text-xs text-slate-400 pb-2">
           CatchUp • מותאם לתוכנית הלימודים של משרד החינוך
         </div>
 
-        {/* חלון אימות Google + בחירת שיוך */}
         {authModal === 'google' && (
           <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
             <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-xl space-y-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-lg text-slate-900">כניסה באמצעות חשבון Google</span>
-                </div>
+                <span className="font-bold text-lg text-slate-900">כניסה באמצעות חשבון Google</span>
                 <button onClick={() => setAuthModal('none')} className="text-slate-400 hover:text-slate-700">
                   <X className="w-5 h-5" />
                 </button>
@@ -541,7 +507,6 @@ export default function App() {
                   />
                 </div>
 
-                {/* בחירה ברורה בין 3 סוגי היוזרים */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">סוג משתמש במערכת</label>
                   <div className="grid grid-cols-3 gap-2">
@@ -641,7 +606,6 @@ export default function App() {
           </div>
         )}
 
-        {/* חלון הזדהות אחידה של משרד החינוך */}
         {authModal === 'moe' && (
           <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
             <div className="bg-white border border-slate-200 rounded-3xl max-w-md w-full overflow-hidden shadow-xl">
@@ -760,9 +724,6 @@ export default function App() {
     );
   }
 
-  // =========================================================================
-  // המערכת לאחר התחברות (מופרדת לחלוטין לפי סוג המשתמש המחובר)
-  // =========================================================================
   const role = currentUser.role;
   const approvedMaterials = materials.filter((m) => m.status === 'approved');
   const visibleMaterials = approvedMaterials.filter((m) => {
@@ -777,7 +738,6 @@ export default function App() {
 
   const completedCount = Object.values(progressMap).filter((s) => s === 'completed').length;
 
-  // צבעי זיהוי עדינים ורגועים לכל סוג משתמש
   const roleBadge =
     role === 'student'
       ? {
@@ -799,10 +759,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-slate-900 flex flex-col" dir="rtl">
-      {/* סרגל עליון נקי עם זיהוי ברור של המשתמש המחובר */}
       <header className="bg-white border-b border-slate-200/90 sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
-          {/* לוגו */}
           <button
             onClick={() => {
               if (role === 'student') setSection('home');
@@ -825,7 +783,6 @@ export default function App() {
             </div>
           </button>
 
-          {/* ניווט לתלמיד בלבד */}
           {role === 'student' && (
             <nav className="flex items-center gap-1 sm:gap-1.5">
               {[
@@ -852,7 +809,6 @@ export default function App() {
             </nav>
           )}
 
-          {/* פרטי משתמש מחובר + כפתור התנתקות אמיתי */}
           <div className="flex items-center gap-2">
             {role === 'student' && (
               <button
@@ -877,11 +833,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* תוכן מרכזי */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8">
-        {/* ================================================================= */}
-        {/* 1. סביבת תלמיד/ה (STUDENT) — גווני כחול-תכלת רגועים               */}
-        {/* ================================================================= */}
         {role === 'student' && (
           <>
             {section === 'home' && (
@@ -902,9 +854,7 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* 3 צעדים פשוטים עם נגיעות צבע רגועות וברורות */}
                     <div className="grid md:grid-cols-3 gap-4 mt-6">
-                      {/* צעד 1 */}
                       <div className="border border-sky-200/80 rounded-2xl p-5 flex flex-col justify-between bg-sky-50/35 hover:border-sky-400 transition">
                         <div>
                           <div className="w-8 h-8 rounded-xl bg-sky-600 text-white text-sm font-bold flex items-center justify-center mb-3 shadow-xs">
@@ -932,7 +882,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* צעד 2 */}
                       <div className="border border-teal-200/80 rounded-2xl p-5 flex flex-col justify-between bg-teal-50/30 hover:border-teal-400 transition">
                         <div>
                           <div className="w-8 h-8 rounded-xl bg-teal-600 text-white text-sm font-bold flex items-center justify-center mb-3 shadow-xs">
@@ -954,7 +903,6 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* צעד 3 */}
                       <div className="border border-amber-200/80 rounded-2xl p-5 flex flex-col justify-between bg-amber-50/30 hover:border-amber-400 transition">
                         <div>
                           <div className="w-8 h-8 rounded-xl bg-amber-500 text-white text-sm font-bold flex items-center justify-center mb-3 shadow-xs">
@@ -979,7 +927,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* שיעורים אחרונים מהכיתה */}
                 <div className="bg-white border border-slate-200/90 rounded-2xl p-6 shadow-xs">
                   <div className="flex items-center justify-between mb-4">
                     <div>
@@ -1030,7 +977,6 @@ export default function App() {
               </div>
             )}
 
-            {/* מסך 2: שיעורים מהכיתה */}
             {section === 'capsules' && (
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1150,7 +1096,6 @@ export default function App() {
               </div>
             )}
 
-            {/* מסך 3: סיכומים ותרגילים */}
             {section === 'library' && (
               <div className="space-y-6">
                 <div>
@@ -1294,7 +1239,6 @@ export default function App() {
               </div>
             )}
 
-            {/* מסך 4: עזרה אישית */}
             {section === 'help' && (
               <div className="grid lg:grid-cols-2 gap-6">
                 <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between space-y-4 shadow-xs">
@@ -1459,7 +1403,6 @@ export default function App() {
               </div>
             )}
 
-            {/* מסך 5: פרופיל תלמיד */}
             {section === 'profile' && (
               <div className="max-w-lg mx-auto bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
                 <h1 className="text-xl font-bold text-slate-900">הפרופיל הלימודי שלי</h1>
@@ -1507,9 +1450,6 @@ export default function App() {
           </>
         )}
 
-        {/* ================================================================= */}
-        {/* 2. סביבת סטודנט חונך (TUTOR) — גווני טורקיז-מרווה רגועים           */}
-        {/* ================================================================= */}
         {role === 'tutor' && (
           <div className="space-y-6">
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
@@ -1599,9 +1539,6 @@ export default function App() {
           </div>
         )}
 
-        {/* ================================================================= */}
-        {/* 3. סביבת הנהלת בית ספר (ADMIN) — גווני אינדיגו מכובדים             */}
-        {/* ================================================================= */}
         {role === 'admin' && (
           <div className="space-y-6">
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
@@ -1622,4 +1559,233 @@ export default function App() {
                   </div>
                   <div className="bg-indigo-50/70 border border-indigo-100 px-4 py-2 rounded-xl">
                     <div className="text-lg font-bold text-indigo-900">{approvedMaterials.length}</div>
-                    <div className="text-xs text-slate-600">תכנים
+                    <div className="text-xs text-slate-600">תכנים מאושרים</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              {radarAlerts.map((alert) => (
+                <div key={alert.id} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-indigo-800 bg-indigo-50 px-2.5 py-0.5 rounded-md">
+                      {alert.subject} • {alert.grade}
+                    </span>
+                    <span
+                      className={`font-semibold px-2 py-0.5 rounded-md ${
+                        alert.severity === 'critical'
+                          ? 'bg-rose-50 text-rose-700'
+                          : alert.severity === 'warning'
+                          ? 'bg-amber-50 text-amber-800'
+                          : 'bg-emerald-50 text-emerald-700'
+                      }`}
+                    >
+                      {alert.stuckPercentage}% מתקשים
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="font-bold text-slate-900">{alert.topic}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {alert.studentsAffected} תלמידים • {alert.timeframe}
+                    </p>
+                  </div>
+
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${
+                        alert.severity === 'critical'
+                          ? 'bg-rose-500'
+                          : alert.severity === 'warning'
+                          ? 'bg-amber-500'
+                          : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${alert.stuckPercentage}%` }}
+                    />
+                  </div>
+
+                  <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl">
+                    {alert.recommendation}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-6 shadow-xs">
+                <h2 className="text-lg font-bold text-slate-900 mb-4">הוספת חומר לימודי</h2>
+                <form onSubmit={handleAddMaterial} className="space-y-3">
+                  <input
+                    type="text"
+                    required
+                    placeholder="כותרת"
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={newSubject}
+                      onChange={(e) => setNewSubject(e.target.value)}
+                      className="p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
+                    >
+                      <option>מתמטיקה 5 יח׳</option>
+                      <option>פיזיקה 5 יח׳</option>
+                      <option>אנגלית 5 יח׳</option>
+                    </select>
+                    <select
+                      value={newType}
+                      onChange={(e) => setNewType(e.target.value as any)}
+                      className="p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
+                    >
+                      <option value="summary">סיכום</option>
+                      <option value="exercise">תרגיל</option>
+                      <option value="video">סרטון</option>
+                    </select>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="נושא"
+                    value={newTopic}
+                    onChange={(e) => setNewTopic(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                  />
+                  <textarea
+                    rows={3}
+                    required
+                    placeholder="תוכן הסיכום או השאלה..."
+                    value={newContent}
+                    onChange={(e) => setNewContent(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm"
+                  >
+                    פרסם למערכת
+                  </button>
+                </form>
+              </div>
+
+              <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 space-y-3 shadow-xs">
+                <h2 className="text-lg font-bold text-slate-900">אישור וניהול תכנים</h2>
+                <div className="divide-y divide-slate-100">
+                  {materials.map((m) => (
+                    <div key={m.id} className="py-3 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-xs text-slate-500">
+                          {m.subject} •{' '}
+                          <span
+                            className={
+                              m.status === 'approved'
+                                ? 'text-emerald-600 font-semibold'
+                                : 'text-amber-600 font-semibold'
+                            }
+                          >
+                            {m.status === 'approved' ? 'מאושר' : 'ממתין לבדיקה'}
+                          </span>
+                        </div>
+                        <div className="text-sm font-semibold text-slate-900">{m.title}</div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {m.status !== 'approved' && (
+                          <button
+                            onClick={() =>
+                              setMaterials((prev) =>
+                                prev.map((x) => (x.id === m.id ? { ...x, status: 'approved' } : x))
+                              )
+                            }
+                            className="p-2 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            title="אשר"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setMaterials((prev) => prev.filter((x) => x.id !== m.id))}
+                          className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:text-rose-600"
+                          title="מחק"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {showUploadModal && (
+        <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">העלאת שיעור מהיום לכיתה</h3>
+              <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-600">
+              צלם את הלוח או כתוב כמה מילים על מה שנלמד — המערכת תיצור מיד סיכום מסודר לחברים שהפסידו.
+            </p>
+            <form onSubmit={handleCreateCapsule} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">מקצוע</label>
+                <select
+                  value={capSubject}
+                  onChange={(e) => setCapSubject(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
+                >
+                  <option>מתמטיקה 5 יח׳</option>
+                  <option>פיזיקה 5 יח׳</option>
+                  <option>אנגלית 5 יח׳</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">נושא השיעור</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="למשל: משוואות טריגונומטריות"
+                  value={capTopic}
+                  onChange={(e) => setCapTopic(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">צילום לוח / מחברת</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="w-full text-xs text-slate-600 file:ml-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:font-semibold file:bg-sky-50 file:text-sky-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">סיכום קצר במילים שלך</label>
+                <textarea
+                  rows={3}
+                  placeholder="מה המורה הדגיש היום בשיעור?"
+                  value={capNotes}
+                  onChange={(e) => setCapNotes(e.target.value)}
+                  className="w-full p-2.5 rounded-xl border border-slate-300 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isCreatingCapsule}
+                className="w-full bg-sky-600 hover:bg-sky-700 disabled:opacity-60 text-white font-semibold py-2.5 rounded-xl text-sm"
+              >
+                {isCreatingCapsule ? 'מכין סיכום מסודר...' : 'צור סיכום שיעור לכיתה'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
