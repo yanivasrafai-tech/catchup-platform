@@ -25,6 +25,7 @@ import {
   GraduationCap,
   Building2,
   Menu,
+  MessageSquare,
 } from 'lucide-react';
 import {
   UserRole,
@@ -35,7 +36,6 @@ import {
   RadarAlert,
 } from './types';
 import {
-  INITIAL_MATERIALS,
   INITIAL_CAPSULES,
   INITIAL_REQUESTS,
   INITIAL_RADAR_ALERTS,
@@ -45,15 +45,53 @@ import { supabase, signInWithGoogle, signInOrSignUp, signOutUser } from './lib/s
 
 type StudentSection = 'home' | 'capsules' | 'library' | 'help' | 'profile';
 
+// חומרי הלימוד הרשמיים של משרד החינוך (התוכנית החדשה)
+const OFFICIAL_MINISTRY_MATERIALS: StudyMaterial[] = [
+  {
+    id: 'gov-mat-1',
+    subject: 'מתמטיקה 5 יח׳',
+    topic: 'חשבון דיפרנציאלי ואינטגרלי (שאלון 582)',
+    title: 'חקירת פונקציות טריגונומטריות ומעריכיות לפי התוכנית החדשה',
+    type: 'summary',
+    difficulty: 'מתקדם',
+    content: 'סיכום רשמי המותאם לרפורמת הבגרויות: דגש על יישומים הנדסיים, אסימפטוטות אנכיות ואופקיות, וגזירת פונקציות מורכבות תוך שימוש בכלל השרשרת.',
+    solutionSteps: 'שלב 1: מציאת תחום ההגדרה.\nשלב 2: גזירה והשוואה לאפס למציאת נקודות קיצון.\nשלב 3: בדיקת תחומי עלייה וירידה וסרטוט סכמטי.',
+    status: 'approved',
+    searchCount: 1420,
+  },
+  {
+    id: 'gov-mat-2',
+    subject: 'פיזיקה 5 יח׳',
+    topic: 'אלקטרומגנטיות ומעגלי זרם (התוכנית החדשה)',
+    title: 'חוק פאראדיי והשראה אלקטרומגנטית',
+    type: 'summary',
+    difficulty: 'מתקדם',
+    content: 'חומר עזר רשמי מטעם פיקוח על הוראת הפיזיקה: שטף מגנטי, שינוי בשדה מגנטי לאורך הזמן, וכיוון הזרם המושרה על פי חוק לנץ.',
+    solutionSteps: 'שלב 1: חישוב השטף ההתחלתי והסופי $\\Phi = B \\cdot A \\cdot \\cos(\\alpha)$.\nשלב 2: הפעלת חוק פאראדיי $\\mathcal{E} = -\\frac{d\\Phi}{dt}$.\nשלב 3: קביעת סימן וקקטור זרם לפי לנץ.',
+    status: 'approved',
+    searchCount: 980,
+  },
+  {
+    id: 'gov-mat-3',
+    subject: 'אנגלית 5 יח׳',
+    topic: 'Module E & G — Literature & Bridging Text',
+    title: 'מדריך כתיבת חיבור טיעון (Argumentative Essay) מתקדם',
+    type: 'summary',
+    difficulty: 'בינוני',
+    content: 'תבנית עבודה רשמית לבחינת הבגרות באנגלית: פסקת מבוא הכוללת Thesis Statement ברור, פסקאות גוף עם ראיות ונימוקים, ופסקת סיכום מסכמת.',
+    solutionSteps: '1. הצגת טענת הנגד והפרכתה בקצרה.\n2. חיזוק הטיעון המרכזי באמצעות דוגמה מעולם התוכן.\n3. שמירה על אוצר מילים תקני ברמה גבוהה (C1).',
+    status: 'approved',
+    searchCount: 1150,
+  }
+];
+
 async function resolveVerifiedUserRole(userId: string, email: string): Promise<UserRole> {
   const lowerEmail = email.toLowerCase().trim();
 
-  // מנהל העל הראשי
   if (lowerEmail === 'yanivasraf45@gmail.com') {
     return 'admin';
   }
 
-  // בדיקה מול טבלת approved_staff במסד הנתונים
   const { data: staffData } = await supabase
     .from('approved_staff')
     .select('role')
@@ -64,12 +102,10 @@ async function resolveVerifiedUserRole(userId: string, email: string): Promise<U
     return staffData.role as UserRole;
   }
 
-  // סטודנט חונך מחייב מייל אקדמי
   if (lowerEmail.endsWith('.ac.il') || lowerEmail.includes('tutor')) {
     return 'tutor';
   }
 
-  // ברירת מחדל לתלמיד
   return 'student';
 }
 
@@ -83,6 +119,27 @@ export default function App() {
   const [authError, setAuthError] = useState('');
   const [section, setSection] = useState<StudentSection>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // מצב וידג'ט צף לתלמיד בכל המסכים
+  const [isFloatingChatOpen, setIsFloatingChatOpen] = useState(false);
+  const [floatingChatInput, setFloatingChatInput] = useState('');
+  const [isFloatingChatLoading, setIsFloatingChatLoading] = useState(false);
+  const [floatingChatHistory, setFloatingChatHistory] = useState<{ sender: 'user' | 'ai'; text: string }[]>([
+    {
+      sender: 'ai',
+      text: 'שלום! אני Catchy AI. אני זמין עבורך כאן בכל רגע לעזור בכל שאלה או תרגיל.',
+    },
+  ]);
+
+  // צאט AI ניהולי מלא למנהל בית הספר
+  const [adminChatInput, setAdminChatInput] = useState('');
+  const [isAdminChatLoading, setIsAdminChatLoading] = useState(false);
+  const [adminChatHistory, setAdminChatHistory] = useState<{ sender: 'user' | 'ai'; text: string }[]>([
+    {
+      sender: 'ai',
+      text: 'שלום אדוני המנהל. אני יועץ ה-AI הניהולי שלך. אשמח לסייע לך בניתוח נתוני בית הספר, תכנון תגבורים, והמלצות פדגוגיות לפי נתוני משרד החינוך.',
+    },
+  ]);
 
   useEffect(() => {
     let isMounted = true;
@@ -130,11 +187,7 @@ export default function App() {
     };
   }, []);
 
-  const [materials, setMaterials] = useState<StudyMaterial[]>(() => {
-    const saved = localStorage.getItem('catchup_v2_materials');
-    return saved ? JSON.parse(saved) : INITIAL_MATERIALS;
-  });
-
+  const [materials] = useState<StudyMaterial[]>(OFFICIAL_MINISTRY_MATERIALS);
   const [capsules, setCapsules] = useState<LiveCapsule[]>(() => {
     const saved = localStorage.getItem('catchup_v2_capsules');
     return saved ? JSON.parse(saved) : INITIAL_CAPSULES;
@@ -149,26 +202,23 @@ export default function App() {
 
   const [progressMap, setProgressMap] = useState<Record<string, 'in_progress' | 'completed'>>(() => {
     const saved = localStorage.getItem('catchup_v2_progress');
-    return saved ? JSON.parse(saved) : { 'mat-1': 'completed' };
+    return saved ? JSON.parse(saved) : { 'gov-mat-1': 'completed' };
   });
 
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('catchup_v2_favorites');
-    return saved ? JSON.parse(saved) : ['mat-1'];
+    return saved ? JSON.parse(saved) : ['gov-mat-1'];
   });
 
-  // ניהול הרשאות למנהל מערכת ראשי
   const [newStaffEmail, setNewStaffEmail] = useState('');
-  const [newStaffRole, setNewStaffRole] = useState<'tutor' | 'admin'>('admin');
+  const [newStaffRole, setNewStaffRole] = useState<'tutor' | 'admin' | 'student'>('admin');
   const [newStaffSchool, setNewStaffSchool] = useState('אמית ישיבה תיכונית שדרות');
   const [staffMsg, setStaffMsg] = useState('');
 
-  // כלי AI לסטודנט חונך
   const [tutorAiInput, setTutorAiInput] = useState('');
   const [tutorAiOutput, setTutorAiOutput] = useState('');
   const [isTutorAiLoading, setIsTutorAiLoading] = useState(false);
 
-  useEffect(() => localStorage.setItem('catchup_v2_materials', JSON.stringify(materials)), [materials]);
   useEffect(() => localStorage.setItem('catchup_v2_capsules', JSON.stringify(capsules)), [capsules]);
   useEffect(() => localStorage.setItem('catchup_v2_requests', JSON.stringify(requests)), [requests]);
   useEffect(() => localStorage.setItem('catchup_v2_progress', JSON.stringify(progressMap)), [progressMap]);
@@ -201,12 +251,6 @@ export default function App() {
   const [reqTime, setReqTime] = useState('היום אחה״צ (17:00–19:00)');
   const [reqContact, setReqContact] = useState('');
   const [createdClinicalPreview, setCreatedClinicalPreview] = useState<string | null>(null);
-
-  const [newTitle, setNewTitle] = useState('');
-  const [newSubject, setNewSubject] = useState('מתמטיקה 5 יח׳');
-  const [newTopic, setNewTopic] = useState('');
-  const [newType, setNewType] = useState<'summary' | 'exercise' | 'video'>('summary');
-  const [newContent, setNewContent] = useState('');
 
   const handleGoogleLogin = async () => {
     setAuthError('');
@@ -255,19 +299,43 @@ export default function App() {
     if (error) {
       setStaffMsg('שגיאה: ' + error.message);
     } else {
-      setStaffMsg(`המייל ${newStaffEmail} הוגדר בהצלחה כ-${newStaffRole === 'admin' ? 'מנהל בי״ס' : 'סטודנט חונך'}.`);
+      setStaffMsg(`המייל ${newStaffEmail} הוגדר בהצלחה כתפקיד: ${newStaffRole}.`);
       setNewStaffEmail('');
     }
   };
 
   const handleExportSchoolData = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ school: currentUser?.school, requests, materials, capsules }, null, 2));
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ school: currentUser?.school, requests, materials: OFFICIAL_MINISTRY_MATERIALS, capsules }, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
     downloadAnchor.setAttribute("download", `CatchUp_School_Report_${currentUser?.school || 'Data'}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+  };
+
+  const handleFloatingChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!floatingChatInput.trim()) return;
+    const text = floatingChatInput;
+    setFloatingChatHistory((prev) => [...prev, { sender: 'user', text }]);
+    setFloatingChatInput('');
+    setIsFloatingChatLoading(true);
+    const reply = await askCatchyTutor(text, 'כללי');
+    setFloatingChatHistory((prev) => [...prev, { sender: 'ai', text: reply }]);
+    setIsFloatingChatLoading(false);
+  };
+
+  const handleAdminChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminChatInput.trim()) return;
+    const text = adminChatInput;
+    setAdminChatHistory((prev) => [...prev, { sender: 'user', text }]);
+    setAdminChatInput('');
+    setIsAdminChatLoading(true);
+    const reply = await askCatchyTutor(`אתה עוזר ניהולי בכיר למנהל בית ספר. השב מקצועית לשאלה הבאה: ${text}`, 'ניהול בית ספר');
+    setAdminChatHistory((prev) => [...prev, { sender: 'ai', text: reply }]);
+    setIsAdminChatLoading(false);
   };
 
   const handleTutorAiHelp = async () => {
@@ -310,7 +378,6 @@ export default function App() {
     };
 
     setCapsules([created, ...capsules]);
-    setCurrentUser((p) => (p ? { ...p, xp: p.xp + 50 } : null));
     setIsCreatingCapsule(false);
     setShowUploadModal(false);
     setCapTopic('');
@@ -358,26 +425,6 @@ export default function App() {
     setReqTopic('');
   };
 
-  const handleAddMaterial = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim() || !newTopic.trim() || !newContent.trim()) return;
-    const item: StudyMaterial = {
-      id: `mat-${Date.now()}`,
-      subject: newSubject,
-      topic: newTopic,
-      title: newTitle,
-      type: newType,
-      difficulty: 'בינוני',
-      content: newContent,
-      status: 'approved',
-      searchCount: 1,
-    };
-    setMaterials([item, ...materials]);
-    setNewTitle('');
-    setNewTopic('');
-    setNewContent('');
-  };
-
   if (isAuthChecking) {
     return (
       <div className="min-h-screen bg-[#F4F7FB] flex items-center justify-center p-4" dir="rtl">
@@ -400,7 +447,7 @@ export default function App() {
             <span className="font-extrabold text-xl text-slate-900 tracking-tight">CatchUp</span>
           </div>
           <span className="text-xs text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-xs">
-            פלטפורמת השלמת פערים לבתי ספר
+            פלטפורמת השלמת פערים לבתי ספר • משרד החינוך
           </span>
         </div>
 
@@ -412,7 +459,7 @@ export default function App() {
               <div className="text-center space-y-2">
                 <h1 className="text-2xl font-extrabold text-slate-900">כניסה למערכת CatchUp</h1>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  התחבר באמצעות Google או באמצעות אימייל וסיסמה. המערכת מזהה אוטומטית את הרשאותיך (מנהל, חונך אקדמי או תלמיד).
+                  התחבר באמצעות Google או באמצעות אימייל וסיסמה. כל חומרי משרד החינוך מעודכנים אוטומטית במערכת.
                 </p>
               </div>
 
@@ -488,7 +535,7 @@ export default function App() {
         </div>
 
         <div className="text-center text-xs text-slate-400 pb-2">
-          CatchUp • מותאם לתוכנית הלימודים של משרד החינוך
+          CatchUp • מותאם לתוכנית הלימודים החדשה של משרד החינוך
         </div>
       </div>
     );
@@ -517,7 +564,7 @@ export default function App() {
       : { label: isSuperAdmin ? 'מנהל מערכת ראשי (Super Admin)' : `הנהלת בי״ס • ${currentUser.school}`, classes: 'bg-indigo-50 text-indigo-700 border-indigo-200', logoBg: 'bg-indigo-600' };
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-slate-900 flex flex-col" dir="rtl">
+    <div className="min-h-screen bg-[#F4F7FB] text-slate-900 flex flex-col relative" dir="rtl">
       <header className="bg-white border-b border-slate-200/90 sticky top-0 z-30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -545,7 +592,7 @@ export default function App() {
               {[
                 { id: 'home', label: 'ראשי' },
                 { id: 'capsules', label: 'שיעורים מהכיתה' },
-                { id: 'library', label: 'סיכומים ותרגילים' },
+                { id: 'library', label: 'סיכומים ותרגילים (משרד החינוך)' },
                 { id: 'help', label: 'עזרה אישית' },
               ].map((nav) => (
                 <button
@@ -597,13 +644,12 @@ export default function App() {
           </div>
         </div>
 
-        {/* תפריט נשלף לנייד עבור תלמידים */}
         {role === 'student' && mobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 space-y-1.5 shadow-md">
             {[
               { id: 'home', label: 'ראשי' },
               { id: 'capsules', label: 'שיעורים מהכיתה' },
-              { id: 'library', label: 'סיכומים ותרגילים' },
+              { id: 'library', label: 'סיכומים ותרגילים (משרד החינוך)' },
               { id: 'help', label: 'עזרה אישית' },
               { id: 'profile', label: 'הפרופיל שלי' },
             ].map((nav) => (
@@ -637,7 +683,7 @@ export default function App() {
                       <div>
                         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">שלום {currentUser.name} 👋</h1>
                         <p className="text-slate-600 text-sm sm:text-base mt-1">
-                          בחר פעולה אחת פשוטה כדי להשלים חומר או להתקדם בלימודים:
+                          כל תוכנית הלימודים החדשה של משרד החינוך מובנית ומעודכנת כאן עבורך:
                         </p>
                       </div>
                       <div className="text-xs text-slate-600 bg-sky-50/70 border border-sky-100 px-3.5 py-2 rounded-xl">
@@ -673,9 +719,9 @@ export default function App() {
                           <div className="w-8 h-8 rounded-xl bg-teal-600 text-white text-sm font-bold flex items-center justify-center mb-3 shadow-xs">
                             2
                           </div>
-                          <h2 className="font-bold text-lg text-slate-900">סיכומים ותרגילים</h2>
+                          <h2 className="font-bold text-lg text-slate-900">סיכומים ותרגילים רשמיים</h2>
                           <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
-                            עבור על סיכומי החומר לבגרות ותרגל שאלות עם פתרונות שלב-אחר-שלב.
+                            כל חומרי הלימוד הרשמיים של משרד החינוך בתוכנית החדשה עם פתרונות שלב-אחר-שלב.
                           </p>
                         </div>
                         <div className="mt-5">
@@ -683,7 +729,7 @@ export default function App() {
                             onClick={() => setSection('library')}
                             className="w-full bg-white hover:bg-teal-50/60 text-teal-900 border border-teal-300 text-sm font-semibold py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-1.5"
                           >
-                            פתח חומרי לימוד
+                            פתח חומרי משרד החינוך
                             <ChevronLeft className="w-4 h-4" />
                           </button>
                         </div>
@@ -809,8 +855,8 @@ export default function App() {
             {section === 'library' && (
               <div className="space-y-6">
                 <div>
-                  <h1 className="text-2xl font-bold text-slate-900">סיכומים ותרגילים לבגרות</h1>
-                  <p className="text-sm text-slate-600">סנן לפי מקצוע ובחר נושא לתרגול</p>
+                  <h1 className="text-2xl font-bold text-slate-900">סיכומים ותרגילים רשמיים (משרד החינוך)</h1>
+                  <p className="text-sm text-slate-600">כל החומרים הרשמיים בתוכנית החדשה מוטענים ומוכנים עבורך במערכת.</p>
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row gap-3 shadow-xs">
@@ -820,7 +866,7 @@ export default function App() {
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="חפש נושא..."
+                      placeholder="חפש נושא בתוכנית הלימודים..."
                       className="w-full pr-10 pl-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-sky-500"
                     />
                   </div>
@@ -849,7 +895,9 @@ export default function App() {
                       <div key={item.id} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-xs">
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <span className="text-xs font-semibold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md">{item.subject}</span>
+                            <span className="text-xs font-semibold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md">
+                              {item.subject} • רשמי משרד החינוך
+                            </span>
                             <h3 className="text-lg font-bold text-slate-900 mt-1">{item.title}</h3>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1043,7 +1091,7 @@ export default function App() {
               <div className="p-6">
                 <h1 className="text-2xl font-bold text-slate-900">שלום {currentUser.name} • מוקד חונכות אקדמית</h1>
                 <p className="text-sm text-slate-600 mt-1">
-                  כאן תוכל לראות את כל בקשות התלמידים, להשתבץ לשיעורים ולהשתמש בכלי ה-AI כדי להכין את ההסבר בצורה הטובה ביותר.
+                  צפה בכל השיעורים והבקשות של התלמידים, השבץ לבחירתך, והשתמש בכלי ה-AI להכנת ההסבר.
                 </p>
               </div>
             </div>
@@ -1081,7 +1129,6 @@ export default function App() {
                 ))}
               </div>
 
-              {/* כלי AI לסטודנט להכנת חומרים */}
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
                 <div className="flex items-center gap-2 text-teal-700">
                   <Sparkles className="w-5 h-5" />
@@ -1113,7 +1160,7 @@ export default function App() {
           </div>
         )}
 
-        {/* ----------------- ממשק מנהל (מנהל ראשי או מנהל בי״ס) ----------------- */}
+        {/* ----------------- ממשק מנהל בית ספר / אדמין ----------------- */}
         {role === 'admin' && (
           <div className="space-y-6">
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
@@ -1125,8 +1172,8 @@ export default function App() {
                   </h1>
                   <p className="text-sm text-slate-600 mt-1">
                     {isSuperAdmin
-                      ? 'שליטה מלאה בכל משתמשי המערכת, מתן הרשאות וניהול תכנים גלובליים.'
-                      : 'צפייה בנתוני התלמידים בבית הספר שלך בלבד, ייצוא דוחות וייעוץ AI חכם.'}
+                      ? 'שליטה מלאה בכל משתמשי המערכת, מתן הרשאות וקישור מיילים כתלמיד או כמנהל.'
+                      : 'צפייה בנתוני התלמידים בבית הספר שלך בלבד, ייצוא דוחות וצאט AI ניהולי.'}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -1136,24 +1183,18 @@ export default function App() {
                   >
                     ייצא נתונים לקובץ (Export)
                   </button>
-                  <button
-                    onClick={() => setShowUploadModal(true)}
-                    className="bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs"
-                  >
-                    העלה חומר לימוד חדש
-                  </button>
                 </div>
               </div>
             </div>
 
-            {/* ניהול הרשאות למנהל ראשי */}
+            {/* ניהול הרשאות למנהל ראשי (שיוך מייל לתלמיד/מנהל/חונך) */}
             {isSuperAdmin && (
               <div className="bg-white border border-indigo-200 rounded-2xl p-6 shadow-xs space-y-4">
                 <div className="flex items-center gap-2 text-indigo-900">
                   <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-bold">הענקת הרשאות למנהלי בתי ספר וסטודנטים חונכים</h2>
+                  <h2 className="text-lg font-bold">שיוך ומתן הרשאות למשתמשים במערכת (כולל גישת תלמיד למנהל)</h2>
                 </div>
-                <p className="text-xs text-slate-600">הזן כתובת מייל של מנהל בית ספר או סטודנט חונך ובחר את תפקידם במערכת:</p>
+                <p className="text-xs text-slate-600">הזן כתובת מייל, בחר האם להגדירו כמנהל בית ספר, סטודנט חונך או תלמיד, והענק הרשאה:</p>
                 <form onSubmit={handleGrantPermission} className="grid sm:grid-cols-4 gap-3">
                   <input
                     type="email"
@@ -1166,10 +1207,11 @@ export default function App() {
                   />
                   <select
                     value={newStaffRole}
-                    onChange={(e) => setNewStaffRole(e.target.value as 'tutor' | 'admin')}
+                    onChange={(e) => setNewStaffRole(e.target.value as 'tutor' | 'admin' | 'student')}
                     className="p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
                   >
                     <option value="admin">מנהל בית ספר</option>
+                    <option value="student">תלמיד (גם למנהל)</option>
                     <option value="tutor">סטודנט חונך</option>
                   </select>
                   <input
@@ -1187,15 +1229,35 @@ export default function App() {
               </div>
             )}
 
-            {/* AI ייעוץ מנהלים */}
-            <div className="bg-gradient-to-l from-indigo-900 to-indigo-800 text-white rounded-2xl p-6 shadow-md space-y-3">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-300" />
-                <h2 className="text-lg font-bold">ייעוץ AI ניהולי לבית הספר</h2>
+            {/* צאט AI ניהולי מלא למנהל בית הספר */}
+            <div className="bg-white border border-indigo-200 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="flex items-center gap-2 text-indigo-900">
+                <Sparkles className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-lg font-bold">צאט AI ניהולי לבית הספר (ייעוץ והחלטות)</h2>
               </div>
-              <p className="text-xs text-indigo-100 leading-relaxed">
-                מערכת ה-AI ניתחה את נתוני התלמידים ב-{currentUser.school}: זוהה קושי בטריגונומטריה ובמעגלי חשמל. מומלץ להקצות 2 שעות תגבור ממוקדות ביום רביעי הקרוב ולפרסם את סיכומי 10 הדקות החדשים לקבוצות הווטסאפ השכבתיות.
-              </p>
+              <p className="text-xs text-slate-600">התכתב חופשי עם יועץ ה-AI הניהולי כדי לקבל תוכניות עבודה, עצות פדגוגיות ודרכי ייעול וסדר בבית הספר שלך:</p>
+              
+              <div className="h-64 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                {adminChatHistory.map((m, idx) => (
+                  <div key={idx} className={`p-3 rounded-2xl text-sm ${m.sender === 'user' ? 'bg-indigo-600 text-white mr-8' : 'bg-white border border-slate-200 text-slate-800 ml-6'}`}>
+                    {m.text}
+                  </div>
+                ))}
+                {isAdminChatLoading && <div className="text-xs text-slate-400">יועץ ה-AI מעבד תשובה...</div>}
+              </div>
+
+              <form onSubmit={handleAdminChatSubmit} className="flex gap-2">
+                <input
+                  type="text"
+                  value={adminChatInput}
+                  onChange={(e) => setAdminChatInput(e.target.value)}
+                  placeholder="שאל שאלה ניהולית (למשל: אילו תגבורים כדאי לפתוח לקראת הבגרויות?)..."
+                  className="flex-1 text-sm p-3 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-500"
+                />
+                <button type="submit" className="bg-indigo-600 text-white px-5 rounded-xl">
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
             </div>
 
             <div className="grid md:grid-cols-3 gap-4">
@@ -1213,20 +1275,14 @@ export default function App() {
             </div>
 
             <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-3">
-              <h2 className="text-lg font-bold text-slate-900">ניהול תכנים ואישור חומרי לימוד</h2>
+              <h2 className="text-lg font-bold text-slate-900">חומרי הלימוד הרשמיים המוטענים במערכת (משרד החינוך)</h2>
               <div className="divide-y divide-slate-100">
                 {materials.map((m) => (
                   <div key={m.id} className="py-3 flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-xs text-slate-500">{m.subject} • סטטוס: <strong className="text-emerald-600">מאושר</strong></div>
+                      <div className="text-xs text-slate-500">{m.subject} • תוכנית חדשה • סטטוס: <strong className="text-emerald-600">פעיל ומאושר</strong></div>
                       <div className="text-sm font-semibold text-slate-900">{m.title}</div>
                     </div>
-                    <button
-                      onClick={() => setMaterials((prev) => prev.filter((x) => x.id !== m.id))}
-                      className="p-2 rounded-lg bg-slate-100 text-slate-600 hover:text-rose-600"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
                   </div>
                 ))}
               </div>
@@ -1235,12 +1291,67 @@ export default function App() {
         )}
       </main>
 
-      {/* מודאל העלאת חומר לימוד או שיעור */}
+      {/* וידג'ט צף קבוע בצד ימין למטה עבור תלמידים בכל המסכים */}
+      {role === 'student' && (
+        <div className="fixed bottom-6 right-6 z-50">
+          {!isFloatingChatOpen && (
+            <button
+              onClick={() => setIsFloatingChatOpen(true)}
+              className="w-14 h-14 rounded-full bg-sky-600 hover:bg-sky-700 text-white shadow-xl flex items-center justify-center transition transform hover:scale-105 active:scale-95 group"
+              title="פתח את Catchy AI"
+            >
+              <Sparkles className="w-6 h-6" />
+              <span className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white animate-pulse"></span>
+            </button>
+          )}
+
+          {isFloatingChatOpen && (
+            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl w-80 sm:w-96 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+              <div className="bg-sky-600 text-white p-4 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center font-bold text-sm">C</div>
+                  <div>
+                    <h3 className="font-bold text-sm">Catchy AI • עוזר לימודי אישי</h3>
+                    <p className="text-[10px] text-sky-100">זמין תמיד לכל שאלה שלך</p>
+                  </div>
+                </div>
+                <button onClick={() => setIsFloatingChatOpen(false)} className="text-white hover:bg-sky-700 p-1.5 rounded-full">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="h-72 overflow-y-auto p-4 space-y-3 bg-slate-50 text-sm">
+                {floatingChatHistory.map((m, idx) => (
+                  <div key={idx} className={`p-3 rounded-2xl whitespace-pre-line ${m.sender === 'user' ? 'bg-sky-600 text-white mr-6' : 'bg-white border border-slate-200 text-slate-800 ml-6'}`}>
+                    {m.text}
+                  </div>
+                ))}
+                {isFloatingChatLoading && <div className="text-xs text-slate-400">Catchy חושב על תשובה...</div>}
+              </div>
+
+              <form onSubmit={handleFloatingChatSubmit} className="p-3 bg-white border-t border-slate-100 flex gap-2">
+                <input
+                  type="text"
+                  value={floatingChatInput}
+                  onChange={(e) => setFloatingChatInput(e.target.value)}
+                  placeholder="שאל שאלה על כל תרגיל או נושא..."
+                  className="flex-1 text-xs px-3 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-sky-500"
+                />
+                <button type="submit" className="bg-sky-600 hover:bg-sky-700 text-white px-3 py-2.5 rounded-xl text-xs flex items-center justify-center">
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* מודאל העלאת שיעור מהכיתה (לתלמיד/מנהל) */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900">העלאת חומר לימוד או סיכום לכיתה</h3>
+              <h3 className="text-lg font-bold text-slate-900">העלאת סיכום שיעור מהכיתה</h3>
               <button onClick={() => setShowUploadModal(false)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
