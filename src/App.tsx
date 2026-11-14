@@ -26,6 +26,8 @@ import {
   Building2,
   Menu,
   MessageSquare,
+  Server,
+  Users,
 } from 'lucide-react';
 import {
   UserRole,
@@ -45,43 +47,172 @@ import { supabase, signInWithGoogle, signInOrSignUp, signOutUser } from './lib/s
 
 type StudentSection = 'home' | 'capsules' | 'library' | 'help' | 'profile';
 
-// חומרי הלימוד הרשמיים של משרד החינוך (התוכנית החדשה)
-const OFFICIAL_MINISTRY_MATERIALS: StudyMaterial[] = [
+// מאגר מקיף של כל חומרי הלימוד לפי 7 קטגוריות משרד החינוך (התוכנית החדשה)
+const ALL_MINISTRY_SUBJECTS_MATERIALS: StudyMaterial[] = [
+  // 1. מקצועות ליבה
   {
-    id: 'gov-mat-1',
+    id: 'mat-core-1',
     subject: 'מתמטיקה 5 יח׳',
-    topic: 'חשבון דיפרנציאלי ואינטגרלי (שאלון 582)',
-    title: 'חקירת פונקציות טריגונומטריות ומעריכיות לפי התוכנית החדשה',
+    topic: 'חשבון דיפרנציאלי ואינטגרלי',
+    title: 'חקירת פונקציות מעריכיות ולוגריתמיות (שאלון 582)',
     type: 'summary',
     difficulty: 'מתקדם',
-    content: 'סיכום רשמי המותאם לרפורמת הבגרויות: דגש על יישומים הנדסיים, אסימפטוטות אנכיות ואופקיות, וגזירת פונקציות מורכבות תוך שימוש בכלל השרשרת.',
-    solutionSteps: 'שלב 1: מציאת תחום ההגדרה.\nשלב 2: גזירה והשוואה לאפס למציאת נקודות קיצון.\nשלב 3: בדיקת תחומי עלייה וירידה וסרטוט סכמטי.',
+    content: 'סיכום רשמי: מציאת תחום הגדרה, נקודות קיצון, אסימפטוטות אנכיות ואופקיות, וסרטוט גרף מדויק לפי רפורמת הבגרויות.',
+    solutionSteps: '1. תחום הגדרה: דרישת חיוביות לוגריתם ושונה מאפס במכנה.\n2. גזירה לפי כלל המכפלה והשרשרת.\n3. מציאת נקודות קיצון והכרעה.',
     status: 'approved',
-    searchCount: 1420,
+    searchCount: 2400,
   },
   {
-    id: 'gov-mat-2',
-    subject: 'פיזיקה 5 יח׳',
-    topic: 'אלקטרומגנטיות ומעגלי זרם (התוכנית החדשה)',
-    title: 'חוק פאראדיי והשראה אלקטרומגנטית',
-    type: 'summary',
-    difficulty: 'מתקדם',
-    content: 'חומר עזר רשמי מטעם פיקוח על הוראת הפיזיקה: שטף מגנטי, שינוי בשדה מגנטי לאורך הזמן, וכיוון הזרם המושרה על פי חוק לנץ.',
-    solutionSteps: 'שלב 1: חישוב השטף ההתחלתי והסופי $\\Phi = B \\cdot A \\cdot \\cos(\\alpha)$.\nשלב 2: הפעלת חוק פאראדיי $\\mathcal{E} = -\\frac{d\\Phi}{dt}$.\nשלב 3: קביעת סימן וקקטור זרם לפי לנץ.',
-    status: 'approved',
-    searchCount: 980,
-  },
-  {
-    id: 'gov-mat-3',
+    id: 'eng-core-1',
     subject: 'אנגלית 5 יח׳',
-    topic: 'Module E & G — Literature & Bridging Text',
-    title: 'מדריך כתיבת חיבור טיעון (Argumentative Essay) מתקדם',
+    topic: 'Literature & Bridging Text',
+    title: 'ניתוח יצירה ספרותית והשוואתה לטקסט חיצוני (Module E/G)',
+    type: 'summary',
+    difficulty: 'מתקדם',
+    content: 'מדריך כתיבה מתקדם הכולל מילות קישור תקניות, מבנה פסקת טיעון והתייחסות למושגים ספרותיים (Higher-Order Thinking Skills).',
+    solutionSteps: '1. הצגת טענת המפתח (Thesis).\n2. הבאת ראיות מתוך הטקסט.\n3. ניתוח והסבר הקשר.',
+    status: 'approved',
+    searchCount: 1950,
+  },
+  {
+    id: 'civ-core-1',
+    subject: 'אזרחות',
+    topic: 'הגישה הדמוקרטית והמדינה היהודית',
+    title: 'עקרונות הדמוקרטיה וזכויות אדם ואזרח',
     type: 'summary',
     difficulty: 'בינוני',
-    content: 'תבנית עבודה רשמית לבחינת הבגרות באנגלית: פסקת מבוא הכוללת Thesis Statement ברור, פסקאות גוף עם ראיות ונימוקים, ופסקת סיכום מסכמת.',
-    solutionSteps: '1. הצגת טענת הנגד והפרכתה בקצרה.\n2. חיזוק הטיעון המרכזי באמצעות דוגמה מעולם התוכן.\n3. שמירה על אוצר מילים תקני ברמה גבוהה (C1).',
+    content: 'סיכום מלא של סוגיות הליבה באזרחות: מתח בין אופי המדינה לזכויות מיעוטים, עקרון שלטון העם, והכרזת העצמאות.',
+    solutionSteps: '1. זיהוי הזכות או העקרון המופיע באירוע.\n2. הצגת ההגדרה המדויקת.\n3. יישום מלא על נתוני האירוע בשאלה.',
     status: 'approved',
-    searchCount: 1150,
+    searchCount: 1620,
+  },
+  {
+    id: 'hist-core-1',
+    subject: 'היסטוריה',
+    topic: 'לאומיות באירופה ובניית הבית המשותף',
+    title: 'צמיחת התנועות הלאומיות במאה ה-19 והעלייה הראשונה והשנייה',
+    type: 'summary',
+    difficulty: 'בינוני',
+    content: 'סיכום היסטורי מקיף: הגורמים לצמיחת הלאומיות המודרנית, מאפייני התנועות, והקשיים של העולים לארץ ישראל.',
+    solutionSteps: '1. פירוט הגורמים (גורמי תרבות, פוליטיקה ותיעוש).\n2. השוואה בין דפוסי פעולה.\n3. סיכום השלכות היסטוריות.',
+    status: 'approved',
+    searchCount: 1400,
+  },
+  {
+    id: 'hebr-core-1',
+    subject: 'הבעה ולשון עברית',
+    topic: 'הבנת הנקרא ותחביר',
+    title: 'מערכת השורשים, גזרות הפועל ותחביר משפט ייחודי',
+    type: 'summary',
+    difficulty: 'בינוני',
+    content: 'הכנה מלאה לבגרות בלשון: ניתוח מבנה הפועל, זיהוי פסוקיות, כללי פיסוק מתקדמים וכתיבת תשובון טיעון תקני.',
+    solutionSteps: '1. בידוד שורש ובניין.\n2. בדיקת התאמה בין נושא ונשוא.\n3. הוכחת תפקיד תחבירי במשפט.',
+    status: 'approved',
+    searchCount: 1800,
+  },
+  {
+    id: 'bible-core-1',
+    subject: 'תנ"ך / מקרא',
+    topic: 'חוק ומשפט במקרא ובנביא ראשון',
+    title: 'סוגיות מוסר וחברה בספרי נביאים וספרי חוק',
+    type: 'summary',
+    difficulty: 'בינוני',
+    content: 'סיכום פרקי הלימוד בתנ"ך: השוואה בין חוק מקראי לחוק המזרח הקדום, ותפיסת הצדק החברתי בנביאי ישראל.',
+    solutionSteps: '1. קריאת הפסוקים והבנת הפירוש המילולי.\n2. השוואה למקורות חיצוניים.\n3. הסקת מסקנות ערכיות.',
+    status: 'approved',
+    searchCount: 1100,
+  },
+  {
+    id: 'lit-core-1',
+    subject: 'ספרות',
+    topic: 'שירה וסיפור קצר',
+    title: 'ניתוח יצירות שירה עברית מודרנית וסיפורת',
+    type: 'summary',
+    difficulty: 'בינוני',
+    content: 'ניתוח מוטיבים מרכזיים, אמצעים אמנותיים (מטפורות, דימויים ואלגוריות) ביצירות חובה לבגרות.',
+    solutionSteps: '1. זיהוי הדובר והסיטואציה בשיר.\n2. איתור אמצעים אומנותיים מרכזיים.\n3. חיבור למשמעות הכללית.',
+    status: 'approved',
+    searchCount: 950,
+  },
+
+  // 2. מקצועות תורניים
+  {
+    id: 'jew-1',
+    subject: 'תורה שבעל פה (תושב"ע)',
+    topic: 'משנה וגמרא',
+    title: 'סוגיות מרכזיות במסכת ברכות ובבא מציעא',
+    type: 'summary',
+    difficulty: 'מתקדם',
+    content: 'ביאור עומק למבנה הסוגיה התלמודית, מושגי יסוד הלכתיים, וכללי פסיקה מרכזיים.',
+    solutionSteps: '1. הבנת המחלוקת במשנה.\n2. קושיית הגמרא ותירוצה.\n3. פסיקת הלכה למעשה.',
+    status: 'approved',
+    searchCount: 600,
+  },
+
+  // 3. מדעים
+  {
+    id: 'sci-phys-1',
+    subject: 'פיזיקה 5 יח׳',
+    topic: 'מכניקה ואלקטרומגנטיות',
+    title: 'קינמטיקה, חוקי ניוטון ושדות מגנטיים',
+    type: 'summary',
+    difficulty: 'מתקדם',
+    content: 'סיכום פיזיקלי מתקדם: תנועה שוות תאוצה, תנועה מעגלית, חוק שימור התנע וחוק פאראדיי.',
+    solutionSteps: '1. תרשים כוחות מלא במערכת צירים.\n2. בניית משוואות תנועה לפי חוקי ניוטון.\n3. פתרון אלגברי ובדיקת יחידות מידה.',
+    status: 'approved',
+    searchCount: 2100,
+  },
+  {
+    id: 'sci-bio-1',
+    subject: 'ביולוגיה',
+    topic: 'התא וגנטיקה',
+    title: 'מבנה התא, תהליכי מטבוליזם ותורשה מנדליאנית',
+    type: 'summary',
+    difficulty: 'מתקדם',
+    content: 'סיכום תהליכים ביולוגיים: נשימה תאית, פוטוסינתזה, שכפול DNA ויצירת חלבונים.',
+    solutionSteps: '1. ניתוח גרפים של קצב אנזימטי.\n2. בניית טבלאות פונט בבעיות גנטיות.\n3. הסקת מסקנות מניסויים.',
+    status: 'approved',
+    searchCount: 1300,
+  },
+  {
+    id: 'sci-cs-1',
+    subject: 'מדעי המחשב / רובוטיקה',
+    topic: 'תכנות מונחה עצמים ומבני נתונים',
+    title: 'אלגוריתמים מתקדמים, עצים ומחלקות ב-C# / Python',
+    type: 'summary',
+    difficulty: 'מתקדם',
+    content: 'עבודה עם עצים בינאריים, רקורסיה, מחלקות וירושה, וניתוח סיבוכיות זמן ריצה.',
+    solutionSteps: '1. הגדרת מבנה המחלקה.\n2. מימוש פונקציות רקורסיביות.\n3. בדיקת מקרי קצה.',
+    status: 'approved',
+    searchCount: 1750,
+  },
+
+  // 4. מדעי החברה
+  {
+    id: 'soc-psych-1',
+    subject: 'פסיכולוגיה',
+    topic: 'תהליכים קוגניטיביים ומוטיבציה',
+    title: 'גישות פסיכולוגיות מרכזיות ומנגנוני הגנה',
+    type: 'summary',
+    difficulty: 'בינוני',
+    content: 'הכרת הגישה הפסיכודינמית, ההתנהגותית וההומניסטית, וניתוח מחקרים אמפיריים.',
+    solutionSteps: '1. זיהוי הגישה התאורטית.\n2. התאמת המושגים לאירוע הבוחן.\n3. ניתוח ביקורתי.',
+    status: 'approved',
+    searchCount: 820,
+  },
+
+  // 5. טכנולוגיים
+  {
+    id: 'tech-elec-1',
+    subject: 'הנדסת אלקטרוניקה ומחשבים',
+    topic: 'מערכות ספרתיות ומיקרו-בקרים',
+    title: 'שערים לוגיים, אלגברה בוליאנית ותכנון מעגלים',
+    type: 'summary',
+    difficulty: 'מתקדם',
+    content: 'תכנון מעגלים קומבינטוריים וספרתיים, מפת קרנו, ומימוש מערכות בקרה ממוחשבות.',
+    solutionSteps: '1. בניית טבלת אמת.\n2. צמצום ביטויים אלגבריים.\n3. שרטוט המעגל הלוגי.',
+    status: 'approved',
+    searchCount: 710,
   }
 ];
 
@@ -120,14 +251,14 @@ export default function App() {
   const [section, setSection] = useState<StudentSection>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // מצב וידג'ט צף לתלמיד בכל המסכים
+  // וידג'ט צף חכם לתלמיד בכל המסכים
   const [isFloatingChatOpen, setIsFloatingChatOpen] = useState(false);
   const [floatingChatInput, setFloatingChatInput] = useState('');
   const [isFloatingChatLoading, setIsFloatingChatLoading] = useState(false);
   const [floatingChatHistory, setFloatingChatHistory] = useState<{ sender: 'user' | 'ai'; text: string }[]>([
     {
       sender: 'ai',
-      text: 'שלום! אני Catchy AI. אני זמין עבורך כאן בכל רגע לעזור בכל שאלה או תרגיל.',
+      text: 'שלום! אני Catchy AI. אני זמין עבורך כאן בכל רגע לעזור בכל שאלה או תרגיל מכל מקצועות הלימוד.',
     },
   ]);
 
@@ -137,7 +268,7 @@ export default function App() {
   const [adminChatHistory, setAdminChatHistory] = useState<{ sender: 'user' | 'ai'; text: string }[]>([
     {
       sender: 'ai',
-      text: 'שלום אדוני המנהל. אני יועץ ה-AI הניהולי שלך. אשמח לסייע לך בניתוח נתוני בית הספר, תכנון תגבורים, והמלצות פדגוגיות לפי נתוני משרד החינוך.',
+      text: 'שלום אדוני המנהל. אני יועץ ה-AI הניהולי שלך. אשמח לסייע לך בניתוח נתוני בית הספר, תכנון תגבורים לקראת הבגרויות, והמלצות פדגוגיות.',
     },
   ]);
 
@@ -187,7 +318,7 @@ export default function App() {
     };
   }, []);
 
-  const [materials] = useState<StudyMaterial[]>(OFFICIAL_MINISTRY_MATERIALS);
+  const [materials] = useState<StudyMaterial[]>(ALL_MINISTRY_SUBJECTS_MATERIALS);
   const [capsules, setCapsules] = useState<LiveCapsule[]>(() => {
     const saved = localStorage.getItem('catchup_v2_capsules');
     return saved ? JSON.parse(saved) : INITIAL_CAPSULES;
@@ -202,12 +333,12 @@ export default function App() {
 
   const [progressMap, setProgressMap] = useState<Record<string, 'in_progress' | 'completed'>>(() => {
     const saved = localStorage.getItem('catchup_v2_progress');
-    return saved ? JSON.parse(saved) : { 'gov-mat-1': 'completed' };
+    return saved ? JSON.parse(saved) : { 'mat-core-1': 'completed' };
   });
 
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('catchup_v2_favorites');
-    return saved ? JSON.parse(saved) : ['gov-mat-1'];
+    return saved ? JSON.parse(saved) : ['mat-core-1'];
   });
 
   const [newStaffEmail, setNewStaffEmail] = useState('');
@@ -304,11 +435,11 @@ export default function App() {
     }
   };
 
-  const handleExportSchoolData = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ school: currentUser?.school, requests, materials: OFFICIAL_MINISTRY_MATERIALS, capsules }, null, 2));
+  const handleExportSystemData = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ system: "CatchUp Super Admin", materials: ALL_MINISTRY_SUBJECTS_MATERIALS, requests }, null, 2));
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `CatchUp_School_Report_${currentUser?.school || 'Data'}.json`);
+    downloadAnchor.setAttribute("download", `CatchUp_SuperAdmin_System_Report.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -341,7 +472,7 @@ export default function App() {
   const handleTutorAiHelp = async () => {
     if (!tutorAiInput.trim()) return;
     setIsTutorAiLoading(true);
-    const prompt = `אתה עוזר פדגוגי חכם לסטודנטים חונכים. הכן הסבר קצר של 3 שלבים והמחשה פשוטה עבור התלמיד בנושא הבא: ${tutorAiInput}`;
+    const prompt = `אתה עוזר פדגוגי חכם לסטודנטים חונכים. הכן מבנה הסבר פדגוגי מלא, שלבי לימוד והמחשה פשוטה עבור התלמיד בנושא הבא: ${tutorAiInput}`;
     const reply = await askCatchyTutor(prompt, 'חונכות אקדמית');
     setTutorAiOutput(reply);
     setIsTutorAiLoading(false);
@@ -459,7 +590,7 @@ export default function App() {
               <div className="text-center space-y-2">
                 <h1 className="text-2xl font-extrabold text-slate-900">כניסה למערכת CatchUp</h1>
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  התחבר באמצעות Google או באמצעות אימייל וסיסמה. כל חומרי משרד החינוך מעודכנים אוטומטית במערכת.
+                  התחבר באמצעות Google או באמצעות אימייל וסיסמה. כל מקצועות משרד החינוך מעודכנים אוטומטית במערכת.
                 </p>
               </div>
 
@@ -561,7 +692,9 @@ export default function App() {
       ? { label: `תלמיד/ה • שכבת ${currentUser.grade || 'י״א'}`, classes: 'bg-sky-50 text-sky-700 border-sky-200', logoBg: 'bg-sky-600' }
       : role === 'tutor'
       ? { label: 'סטודנט חונך אקדמי', classes: 'bg-teal-50 text-teal-700 border-teal-200', logoBg: 'bg-teal-600' }
-      : { label: isSuperAdmin ? 'מנהל מערכת ראשי (Super Admin)' : `הנהלת בי״ס • ${currentUser.school}`, classes: 'bg-indigo-50 text-indigo-700 border-indigo-200', logoBg: 'bg-indigo-600' };
+      : isSuperAdmin
+      ? { label: 'מנהל מערכת ראשי (Super Admin)', classes: 'bg-purple-50 text-purple-700 border-purple-200', logoBg: 'bg-purple-600' }
+      : { label: `הנהלת בי״ס • ${currentUser.school}`, classes: 'bg-indigo-50 text-indigo-700 border-indigo-200', logoBg: 'bg-indigo-600' };
 
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-slate-900 flex flex-col relative" dir="rtl">
@@ -570,7 +703,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
-                if (role === 'student') setSection('home');
+                if (role === 'student' || isSuperAdmin) setSection('home');
                 setSelectedCapsule(null);
               }}
               className="flex items-center gap-2.5 text-right"
@@ -587,12 +720,12 @@ export default function App() {
             </button>
           </div>
 
-          {role === 'student' && (
+          {(role === 'student' || isSuperAdmin) && (
             <nav className="hidden md:flex items-center gap-1">
               {[
                 { id: 'home', label: 'ראשי' },
                 { id: 'capsules', label: 'שיעורים מהכיתה' },
-                { id: 'library', label: 'סיכומים ותרגילים (משרד החינוך)' },
+                { id: 'library', label: 'כל מקצועות משרד החינוך' },
                 { id: 'help', label: 'עזרה אישית' },
               ].map((nav) => (
                 <button
@@ -614,7 +747,7 @@ export default function App() {
           )}
 
           <div className="flex items-center gap-2">
-            {role === 'student' && (
+            {(role === 'student' || isSuperAdmin) && (
               <button
                 onClick={() => setSection('profile')}
                 title="הפרופיל שלי"
@@ -633,7 +766,7 @@ export default function App() {
               <span className="hidden sm:inline">התנתק</span>
             </button>
 
-            {role === 'student' && (
+            {(role === 'student' || isSuperAdmin) && (
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="md:hidden p-2 rounded-xl bg-slate-100 text-slate-700"
@@ -644,12 +777,12 @@ export default function App() {
           </div>
         </div>
 
-        {role === 'student' && mobileMenuOpen && (
+        {(role === 'student' || isSuperAdmin) && mobileMenuOpen && (
           <div className="md:hidden bg-white border-b border-slate-200 px-4 py-3 space-y-1.5 shadow-md">
             {[
               { id: 'home', label: 'ראשי' },
               { id: 'capsules', label: 'שיעורים מהכיתה' },
-              { id: 'library', label: 'סיכומים ותרגילים (משרד החינוך)' },
+              { id: 'library', label: 'כל מקצועות משרד החינוך' },
               { id: 'help', label: 'עזרה אישית' },
               { id: 'profile', label: 'הפרופיל שלי' },
             ].map((nav) => (
@@ -672,7 +805,7 @@ export default function App() {
       </header>
 
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {role === 'student' && (
+        {(role === 'student' || isSuperAdmin) && (
           <>
             {section === 'home' && (
               <div className="space-y-6 sm:space-y-8">
@@ -683,7 +816,7 @@ export default function App() {
                       <div>
                         <h1 className="text-xl sm:text-2xl font-bold text-slate-900">שלום {currentUser.name} 👋</h1>
                         <p className="text-slate-600 text-sm sm:text-base mt-1">
-                          כל תוכנית הלימודים החדשה של משרד החינוך מובנית ומעודכנת כאן עבורך:
+                          כל תוכנית הלימודים הרשמית של משרד החינוך מובנית ומעודכנת כאן עבורך:
                         </p>
                       </div>
                       <div className="text-xs text-slate-600 bg-sky-50/70 border border-sky-100 px-3.5 py-2 rounded-xl">
@@ -719,9 +852,9 @@ export default function App() {
                           <div className="w-8 h-8 rounded-xl bg-teal-600 text-white text-sm font-bold flex items-center justify-center mb-3 shadow-xs">
                             2
                           </div>
-                          <h2 className="font-bold text-lg text-slate-900">סיכומים ותרגילים רשמיים</h2>
+                          <h2 className="font-bold text-lg text-slate-900">כל מקצועות משרד החינוך</h2>
                           <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">
-                            כל חומרי הלימוד הרשמיים של משרד החינוך בתוכנית החדשה עם פתרונות שלב-אחר-שלב.
+                            כל מקצועות הליבה, מדעים, מדעי הרוח והטכנולוגיה עם הסברים, סרטונים ותרגולים לבגרות.
                           </p>
                         </div>
                         <div className="mt-5">
@@ -729,7 +862,7 @@ export default function App() {
                             onClick={() => setSection('library')}
                             className="w-full bg-white hover:bg-teal-50/60 text-teal-900 border border-teal-300 text-sm font-semibold py-2.5 px-4 rounded-xl transition flex items-center justify-center gap-1.5"
                           >
-                            פתח חומרי משרד החינוך
+                            פתח את כל המקצועות
                             <ChevronLeft className="w-4 h-4" />
                           </button>
                         </div>
@@ -855,8 +988,8 @@ export default function App() {
             {section === 'library' && (
               <div className="space-y-6">
                 <div>
-                  <h1 className="text-2xl font-bold text-slate-900">סיכומים ותרגילים רשמיים (משרד החינוך)</h1>
-                  <p className="text-sm text-slate-600">כל החומרים הרשמיים בתוכנית החדשה מוטענים ומוכנים עבורך במערכת.</p>
+                  <h1 className="text-2xl font-bold text-slate-900">כל מקצועות משרד החינוך (התוכנית החדשה)</h1>
+                  <p className="text-sm text-slate-600">כל המקצועות הרשמיים, כולל סיכומים, סרטוני הסבר ותרגולים מלאים.</p>
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row gap-3 shadow-xs">
@@ -866,12 +999,12 @@ export default function App() {
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="חפש נושא בתוכנית הלימודים..."
+                      placeholder="חפש מקצוע או נושא..."
                       className="w-full pr-10 pl-3 py-2 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-sky-500"
                     />
                   </div>
                   <div className="flex gap-1.5 overflow-x-auto pb-1">
-                    {['הכל', 'מתמטיקה 5 יח׳', 'פיזיקה 5 יח׳', 'אנגלית 5 יח׳'].map((subj) => (
+                    {['הכל', 'מתמטיקה 5 יח׳', 'פיזיקה 5 יח׳', 'אנגלית 5 יח׳', 'אזרחות', 'היסטוריה', 'הבעה ולשון עברית', 'תנ"ך / מקרא', 'ספרות', 'תורה שבעל פה (תושב"ע)', 'ביולוגיה', 'מדעי המחשב / רובוטיקה', 'פסיכולוגיה', 'הנדסת אלקטרוניקה ומחשבים'].map((subj) => (
                       <button
                         key={subj}
                         onClick={() => setSubjectFilter(subj)}
@@ -896,7 +1029,7 @@ export default function App() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <span className="text-xs font-semibold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md">
-                              {item.subject} • רשמי משרד החינוך
+                              {item.subject} • תוכנית משרד החינוך החדשה
                             </span>
                             <h3 className="text-lg font-bold text-slate-900 mt-1">{item.title}</h3>
                           </div>
@@ -933,7 +1066,7 @@ export default function App() {
                               onClick={() => setOpenSolutions((prev) => ({ ...prev, [item.id]: !prev[item.id] }))}
                               className="text-sm font-semibold text-sky-700 hover:text-sky-900 flex items-center gap-1"
                             >
-                              {isOpen ? <><ChevronUp className="w-4 h-4" /> הסתר פתרון</> : <><ChevronDown className="w-4 h-4" /> הצג פתרון שלב-אחר-שלב</>}
+                              {isOpen ? <><ChevronUp className="w-4 h-4" /> הסתר פתרון ותרגול</> : <><ChevronDown className="w-4 h-4" /> הצג פתרון ותרגול שלב-אחר-שלב</>}
                             </button>
                             {isOpen && (
                               <div className="mt-3 p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 text-sm text-slate-800 whitespace-pre-line leading-relaxed">
@@ -956,7 +1089,7 @@ export default function App() {
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <h2 className="text-lg font-bold text-slate-900">1. שאל את Catchy (חונך AI)</h2>
-                        <p className="text-xs text-slate-500">הסברים מיידיים בעברית פשוטה</p>
+                        <p className="text-xs text-slate-500">הסברים מיידיים ועמוקים לבגרות</p>
                       </div>
                       <select
                         value={chatSubject}
@@ -966,6 +1099,9 @@ export default function App() {
                         <option>מתמטיקה 5 יח׳</option>
                         <option>פיזיקה 5 יח׳</option>
                         <option>אנגלית 5 יח׳</option>
+                        <option>אזרחות</option>
+                        <option>היסטוריה</option>
+                        <option>ביולוגיה</option>
                       </select>
                     </div>
 
@@ -980,7 +1116,7 @@ export default function App() {
                           {m.text}
                         </div>
                       ))}
-                      {isChatLoading && <div className="text-xs text-slate-400">כותב תשובה...</div>}
+                      {isChatLoading && <div className="text-xs text-slate-400">Catchy מנסח הסבר פדגוגי מלא...</div>}
                     </div>
                   </div>
 
@@ -989,7 +1125,7 @@ export default function App() {
                       type="text"
                       value={chatInput}
                       onChange={(e) => setChatInput(e.target.value)}
-                      placeholder="שאל שאלה בלשון חופשית..."
+                      placeholder="שאל שאלה בלשון חופשית על כל נושא..."
                       className="flex-1 text-sm px-3.5 py-2.5 rounded-xl border border-slate-300 focus:outline-none focus:border-sky-500"
                     />
                     <button type="submit" className="bg-sky-600 hover:bg-sky-700 text-white px-4 rounded-xl flex items-center justify-center">
@@ -1015,6 +1151,8 @@ export default function App() {
                         <option>מתמטיקה 5 יח׳</option>
                         <option>פיזיקה 5 יח׳</option>
                         <option>אנגלית 5 יח׳</option>
+                        <option>אזרחות</option>
+                        <option>היסטוריה</option>
                       </select>
                     </div>
 
@@ -1057,13 +1195,6 @@ export default function App() {
                       שלח בקשה לסטודנט החונך
                     </button>
                   </form>
-
-                  {createdClinicalPreview && (
-                    <div className="p-4 rounded-xl bg-teal-50 border border-teal-200 text-xs text-slate-800 space-y-1">
-                      <div className="font-bold text-teal-900">הבקשה נשלחה בהצלחה!</div>
-                      <p className="leading-relaxed">{createdClinicalPreview}</p>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1091,7 +1222,7 @@ export default function App() {
               <div className="p-6">
                 <h1 className="text-2xl font-bold text-slate-900">שלום {currentUser.name} • מוקד חונכות אקדמית</h1>
                 <p className="text-sm text-slate-600 mt-1">
-                  צפה בכל השיעורים והבקשות של התלמידים, השבץ לבחירתך, והשתמש בכלי ה-AI להכנת ההסבר.
+                  צפה בכל השיעורים והבקשות של התלמידים, השבץ לבחירתך, והשתמש בכלי ה-AI ליצירת מערכי הסבר עמוקים לתלמיד.
                 </p>
               </div>
             </div>
@@ -1132,9 +1263,9 @@ export default function App() {
               <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
                 <div className="flex items-center gap-2 text-teal-700">
                   <Sparkles className="w-5 h-5" />
-                  <h2 className="text-lg font-bold text-slate-900">כלי AI חכם להעברת החומר לתלמיד</h2>
+                  <h2 className="text-lg font-bold text-slate-900">כלי AI חכם להכנת מערכי הסבר לחונכות</h2>
                 </div>
-                <p className="text-xs text-slate-600">הזן נושא לימודי שאתה הולך ללמד, וקבל מיד מבנה הסבר מומלץ והמחשה פשוטה:</p>
+                <p className="text-xs text-slate-600">הזן נושא לימודי וקבל מיד הסבר פדגוגי עמוק עם דוגמאות להמחשה:</p>
                 <input
                   type="text"
                   placeholder="למשל: חוק השני של ניוטון"
@@ -1148,7 +1279,7 @@ export default function App() {
                   className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
                 >
                   {isTutorAiLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                  <span>צור מבנה הסבר לחונכות</span>
+                  <span>צור מבנה הסבר מקיף לחונכות</span>
                 </button>
                 {tutorAiOutput && (
                   <div className="p-4 rounded-xl bg-slate-50 border text-xs text-slate-800 whitespace-pre-line leading-relaxed">
@@ -1160,86 +1291,82 @@ export default function App() {
           </div>
         )}
 
-        {/* ----------------- ממשק מנהל בית ספר / אדמין ----------------- */}
-        {role === 'admin' && (
+        {/* ----------------- ממשק מנהל מערכת ראשי (Super Admin) נקי ----------------- */}
+        {role === 'admin' && isSuperAdmin && (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-              <div className="h-1.5 bg-indigo-600" />
+            <div className="bg-white border border-purple-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="h-1.5 bg-purple-600" />
               <div className="p-6 flex flex-wrap items-center justify-between gap-4">
                 <div>
-                  <h1 className="text-2xl font-bold text-slate-900">
-                    {isSuperAdmin ? 'ממשק מנהל מערכת ראשי (Super Admin)' : `רדאר ניהול • ${currentUser.school}`}
+                  <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                    <Server className="w-6 h-6 text-purple-600" />
+                    <span>ניהול מערכת ראשי (Super Admin Dashboard)</span>
                   </h1>
                   <p className="text-sm text-slate-600 mt-1">
-                    {isSuperAdmin
-                      ? 'שליטה מלאה בכל משתמשי המערכת, מתן הרשאות וקישור מיילים כתלמיד או כמנהל.'
-                      : 'צפייה בנתוני התלמידים בבית הספר שלך בלבד, ייצוא דוחות וצאט AI ניהולי.'}
+                    מסך בקרה ייעודי לניהול תשתיות, משתמשים, הרשאות רוחביות וייצוא נתונים מערכתי.
                   </p>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleExportSchoolData}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs"
-                  >
-                    ייצא נתונים לקובץ (Export)
-                  </button>
-                </div>
+                <button
+                  onClick={handleExportSystemData}
+                  className="bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-xs"
+                >
+                  <Download className="w-4 h-4" />
+                  ייצוא נתוני מערכת מלאים
+                </button>
               </div>
             </div>
 
-            {/* ניהול הרשאות למנהל ראשי (שיוך מייל לתלמיד/מנהל/חונך) */}
-            {isSuperAdmin && (
-              <div className="bg-white border border-indigo-200 rounded-2xl p-6 shadow-xs space-y-4">
-                <div className="flex items-center gap-2 text-indigo-900">
-                  <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                  <h2 className="text-lg font-bold">שיוך ומתן הרשאות למשתמשים במערכת (כולל גישת תלמיד למנהל)</h2>
-                </div>
-                <p className="text-xs text-slate-600">הזן כתובת מייל, בחר האם להגדירו כמנהל בית ספר, סטודנט חונך או תלמיד, והענק הרשאה:</p>
-                <form onSubmit={handleGrantPermission} className="grid sm:grid-cols-4 gap-3">
-                  <input
-                    type="email"
-                    required
-                    placeholder="user@example.com"
-                    value={newStaffEmail}
-                    onChange={(e) => setNewStaffEmail(e.target.value)}
-                    className="p-2.5 rounded-xl border border-slate-300 text-sm"
-                    dir="ltr"
-                  />
-                  <select
-                    value={newStaffRole}
-                    onChange={(e) => setNewStaffRole(e.target.value as 'tutor' | 'admin' | 'student')}
-                    className="p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
-                  >
-                    <option value="admin">מנהל בית ספר</option>
-                    <option value="student">תלמיד (גם למנהל)</option>
-                    <option value="tutor">סטודנט חונך</option>
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="שם בית הספר"
-                    value={newStaffSchool}
-                    onChange={(e) => setNewStaffSchool(e.target.value)}
-                    className="p-2.5 rounded-xl border border-slate-300 text-sm"
-                  />
-                  <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-xl text-sm">
-                    שמור הרשאה
-                  </button>
-                </form>
-                {staffMsg && <p className="text-xs font-medium text-emerald-700">{staffMsg}</p>}
+            {/* ניהול הרשאות למשתמשים (שיוך תפקיד ומייל) */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="flex items-center gap-2 text-purple-900">
+                <Users className="w-5 h-5 text-purple-600" />
+                <h2 className="text-lg font-bold">ניהול הרשאות משתמשים וקישור תפקידים</h2>
               </div>
-            )}
+              <p className="text-xs text-slate-600">הזן כתובת מייל, בחר האם להגדירו כמנהל בית ספר, סטודנט חונך או תלמיד (כולל גישת תלמיד למנהל):</p>
+              <form onSubmit={handleGrantPermission} className="grid sm:grid-cols-4 gap-3">
+                <input
+                  type="email"
+                  required
+                  placeholder="user@example.com"
+                  value={newStaffEmail}
+                  onChange={(e) => setNewStaffEmail(e.target.value)}
+                  className="p-2.5 rounded-xl border border-slate-300 text-sm"
+                  dir="ltr"
+                />
+                <select
+                  value={newStaffRole}
+                  onChange={(e) => setNewStaffRole(e.target.value as 'tutor' | 'admin' | 'student')}
+                  className="p-2.5 rounded-xl border border-slate-300 text-sm bg-white"
+                >
+                  <option value="admin">מנהל בית ספר</option>
+                  <option value="student">תלמיד (גם למנהל)</option>
+                  <option value="tutor">סטודנט חונך</option>
+                </select>
+                <input
+                  type="text"
+                  placeholder="שם בית הספר"
+                  value={newStaffSchool}
+                  onChange={(e) => setNewStaffSchool(e.target.value)}
+                  className="p-2.5 rounded-xl border border-slate-300 text-sm"
+                />
+                <button type="submit" className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 rounded-xl text-sm">
+                  שמור הרשאה
+                </button>
+              </form>
+              {staffMsg && <p className="text-xs font-medium text-emerald-700">{staffMsg}</p>}
+            </div>
 
-            {/* צאט AI ניהולי מלא למנהל בית הספר */}
-            <div className="bg-white border border-indigo-200 rounded-2xl p-6 shadow-xs space-y-4">
-              <div className="flex items-center gap-2 text-indigo-900">
-                <Sparkles className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-lg font-bold">צאט AI ניהולי לבית הספר (ייעוץ והחלטות)</h2>
+            {/* צאט AI ניהולי מלא למנהל */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4">
+              <div className="flex items-center gap-2 text-purple-900">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                <h2 className="text-lg font-bold">יועץ AI ניהולי לפיתוח המערכת</h2>
               </div>
-              <p className="text-xs text-slate-600">התכתב חופשי עם יועץ ה-AI הניהולי כדי לקבל תוכניות עבודה, עצות פדגוגיות ודרכי ייעול וסדר בבית הספר שלך:</p>
+              <p className="text-xs text-slate-600">התכתב חופשי עם יועץ ה-AI לקבלת המלצות ארכיטקטוניות, פדגוגיות ודרכי ייעול:</p>
               
               <div className="h-64 overflow-y-auto bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
                 {adminChatHistory.map((m, idx) => (
-                  <div key={idx} className={`p-3 rounded-2xl text-sm ${m.sender === 'user' ? 'bg-indigo-600 text-white mr-8' : 'bg-white border border-slate-200 text-slate-800 ml-6'}`}>
+                  <div key={idx} className={`p-3 rounded-2xl text-sm ${m.sender === 'user' ? 'bg-purple-600 text-white mr-6' : 'bg-white border border-slate-200 text-slate-800 ml-6'}`}>
                     {m.text}
                   </div>
                 ))}
@@ -1251,48 +1378,20 @@ export default function App() {
                   type="text"
                   value={adminChatInput}
                   onChange={(e) => setAdminChatInput(e.target.value)}
-                  placeholder="שאל שאלה ניהולית (למשל: אילו תגבורים כדאי לפתוח לקראת הבגרויות?)..."
-                  className="flex-1 text-sm p-3 rounded-xl border border-slate-300 focus:outline-none focus:border-indigo-500"
+                  placeholder="שאל שאלה ניהולית או טכנולוגית..."
+                  className="flex-1 text-sm p-3 rounded-xl border border-slate-300 focus:outline-none focus:border-purple-500"
                 />
-                <button type="submit" className="bg-indigo-600 text-white px-5 rounded-xl">
+                <button type="submit" className="bg-purple-600 text-white px-5 rounded-xl">
                   <Send className="w-4 h-4" />
                 </button>
               </form>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-4">
-              {radarAlerts.map((alert) => (
-                <div key={alert.id} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-xs">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-indigo-800 bg-indigo-50 px-2.5 py-0.5 rounded-md">{alert.subject}</span>
-                    <span className="font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md">{alert.stuckPercentage}% מתקשים</span>
-                  </div>
-                  <h3 className="font-bold text-slate-900">{alert.topic}</h3>
-                  <p className="text-xs text-slate-500">{alert.studentsAffected} תלמידים מושפעים</p>
-                  <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl leading-relaxed">{alert.recommendation}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-3">
-              <h2 className="text-lg font-bold text-slate-900">חומרי הלימוד הרשמיים המוטענים במערכת (משרד החינוך)</h2>
-              <div className="divide-y divide-slate-100">
-                {materials.map((m) => (
-                  <div key={m.id} className="py-3 flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-xs text-slate-500">{m.subject} • תוכנית חדשה • סטטוס: <strong className="text-emerald-600">פעיל ומאושר</strong></div>
-                      <div className="text-sm font-semibold text-slate-900">{m.title}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         )}
       </main>
 
       {/* וידג'ט צף קבוע בצד ימין למטה עבור תלמידים בכל המסכים */}
-      {role === 'student' && (
+      {(role === 'student' || isSuperAdmin) && (
         <div className="fixed bottom-6 right-6 z-50">
           {!isFloatingChatOpen && (
             <button
@@ -1326,7 +1425,7 @@ export default function App() {
                     {m.text}
                   </div>
                 ))}
-                {isFloatingChatLoading && <div className="text-xs text-slate-400">Catchy חושב על תשובה...</div>}
+                {isFloatingChatLoading && <div className="text-xs text-slate-400">Catchy חושב על תשובה מקיפה...</div>}
               </div>
 
               <form onSubmit={handleFloatingChatSubmit} className="p-3 bg-white border-t border-slate-100 flex gap-2">
@@ -1346,7 +1445,7 @@ export default function App() {
         </div>
       )}
 
-      {/* מודאל העלאת שיעור מהכיתה (לתלמיד/מנהל) */}
+      {/* מודאל העלאת שיעור מהכיתה */}
       {showUploadModal && (
         <div className="fixed inset-0 bg-slate-900/40 z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
@@ -1367,6 +1466,9 @@ export default function App() {
                   <option>מתמטיקה 5 יח׳</option>
                   <option>פיזיקה 5 יח׳</option>
                   <option>אנגלית 5 יח׳</option>
+                  <option>אזרחות</option>
+                  <option>היסטוריה</option>
+                  <option>ביולוגיה</option>
                 </select>
               </div>
               <div>
