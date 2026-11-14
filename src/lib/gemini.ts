@@ -6,30 +6,26 @@ const ai = new GoogleGenAI({ apiKey });
 export async function askCatchyTutor(question: string, subject: string): Promise<string> {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-1.5-flash',
       contents: [
         {
           role: 'user',
           parts: [
             {
-              text: `אתה Catchy, חונך ה-AI הרשמי של משרד החינוך לפלטפורמת CatchUp. 
+              text: `אתה Catchy, חונך ה-AI הרשמי של משרד החינוך למתמטיקה ומדעים 5 יח"ל. 
 מקצוע: ${subject}.
-שאלה/בקשה מהתלמיד: ${question}
+שאלה/תרגיל מהתלמיד: ${question}
 
-תן הסבר פדגוגי מעמיק, ברור ובעברית צחה. חילק את התשובה ל:
-1. הבנת היסוד (הסבר קצר על הרעיון המרכזי).
-2. שלבי העבודה או הנוסחאות המרכזיות.
-3. דוגמה פתורה מלאה שלב אחר שלב.
-אל תיתן תשובות כלליות — תן תוכן לימודי אמיתי, מפורט ומקצועי המותאם לבגרות.`
+תן הסבר פדגוגי מעמיק, אמיתי ופתרון מלא שלב אחר שלב בעברית צחה. אל תיתן תשובות כלליות — פתור בדיוק את מה שהתלמיד שאל.`
             }
           ]
         }
       ]
     });
     return response.text || 'לא התקבלה תשובה מהמערכת. נסה שוב.';
-  } catch (error) {
+  } catch (error: any) {
     console.error('Gemini error:', error);
-    return 'שגיאה בתקשורת עם חונך ה-AI. ודא שמפתח ה-API מוגדר כראוי.';
+    return `שגיאה בתקשורת עם חונך ה-AI: ${error?.message || 'אנא בדוק את מפתח ה-API'}`;
   }
 }
 
@@ -39,42 +35,47 @@ export async function generateCapsuleFromInput(
   notes?: string,
   imageBase64?: string
 ) {
-  try {
-    const parts: any[] = [
-      {
-        text: `נתח את השיעור הבא ב-${subject} בנושא "${topic}". ${notes ? `הערות מהכיתה: ${notes}` : ''}
-יצר סיכום שיעור מלא בפורמט JSON בלבד (ללא מעטפות markdown נוספות) הכולל את השדות הבאים:
-- aiSummary (מחרוזת: סיכום מפורט של מה שלמדו)
-- keyFormulas (מערך מחרוזות של נוסחאות או כללים מרכזיים)
-- solvedExample (מחרוזת: שאלה לדוגמה עם פתרון מלא שלב אחר שלב)
-- quickQuiz (מערך אובייקטים עם question ו-answer לבדיקה עצמית)`
-      }
-    ];
+  const parts: any[] = [
+    {
+      text: `אתה מורה פרטי מומחה לבגרויות 5 יח"ל ב-${subject}. 
+התלמיד העלה צילום או שאלה אמיתית בנושא "${topic}". ${notes ? `הערות מהכיתה: ${notes}` : ''}
 
-    if (imageBase64) {
-      const base64Data = imageBase64.split(',')[1] || imageBase64;
-      parts.push({
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: base64Data
-        }
-      });
+נתח את התמונה או השאלה באופן דינמי לחלוטין. אם יש בתמונה שרטוט או תרגיל ספציפי (כמו בטריגונומטריה, גאומטריה או חקר פונקציות), פתור אותו במלואו, אל תמציא סיכומים כלליים!
+
+החזר ניתוח מפורט שישמש כסיכום שיעור הכולל:
+1. הסבר כתוב ומעמיק על הנושא או ניתוח מפורט של השאלה.
+2. נוסחאות וכללים מרכזיים.
+3. פתרון מלא שלב אחר שלב.
+4. שאלת בדיקה עצמית עם תשובה.`
     }
+  ];
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: [{ role: 'user', parts }]
+  if (imageBase64) {
+    const base64Data = imageBase64.includes(',') ? imageBase64.split(',')[1] : imageBase64;
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64Data
+      }
     });
-
-    const text = response.text || '{}';
-    const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return JSON.parse(cleanJson);
-  } catch (e) {
-    return {
-      aiSummary: `סיכום מקיף ומעמיק לנושא ${topic} במקצוע ${subject} המותאם לדרישות משרד החינוך.`,
-      keyFormulas: ['כלל מרכזי 1 בתוכנית החדשה', 'נוסחת עזר לבגרות'],
-      solvedExample: 'שלב 1: זיהוי הנתונים בשאלה.\nשלב 2: הצבה בנוסחה המתאימה.\nשלב 3: הגעה לתוצאה הסופית.',
-      quickQuiz: [{ question: `מה העיקרון המרכזי ב${topic}?`, answer: 'העיקרון מבוסס על יישום נכון של הכללים שלמדנו.' }]
-    };
   }
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-1.5-flash',
+    contents: [{ role: 'user', parts }]
+  });
+
+  const realAiText = response.text || 'לא התקבל ניתוח מה-AI.';
+
+  return {
+    aiSummary: realAiText,
+    keyFormulas: [`ניתוח דינמי מאת Gemini לנושא: ${topic}`],
+    solvedExample: realAiText,
+    quickQuiz: [
+      {
+        question: `בדיקה עצמית על ${topic}`,
+        answer: 'עיין בהסבר המלא של ה-AI שהתקבל למעלה.'
+      }
+    ]
+  };
 }
